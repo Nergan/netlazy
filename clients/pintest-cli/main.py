@@ -36,7 +36,8 @@ def main():
             else:
                 print(f"Unknown command: {cmd_name}")
         except KeyboardInterrupt:
-            print("\nUse 'exit' to quit.")
+            print("\nquit...")
+            return
         except EOFError:
             break
         except Exception as e:

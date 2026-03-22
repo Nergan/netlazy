@@ -18,14 +18,8 @@ def sign_request(
     """
     timestamp = str(int(time.time()))
     nonce = str(uuid.uuid4())
-    # body hash
-    if body:
-        body_hash = hashlib.sha256(body).hexdigest()
-    else:
-        body_hash = ""
-    # каноническая строка
+    body_hash = hashlib.sha256(body).hexdigest() if body else ""
     canonical = f"{method}\n{path}\n{timestamp}\n{nonce}\n{body_hash}"
-    # подпись
     signature = private_key.sign(canonical.encode())
     signature_b64 = base64.b64encode(signature).decode()
     return {

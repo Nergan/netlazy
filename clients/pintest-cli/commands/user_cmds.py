@@ -38,9 +38,10 @@ def me(args, client):
         resp = client.request("GET", "/users/me", signed=True)
         if resp:
             print_response(resp)
+        else:
+            print("No response from server")
         return
     if args[0] == "update":
-        # PATCH /users/me
         update_data = {}
         for item in args[1:]:
             if '=' in item:
@@ -58,6 +59,8 @@ def me(args, client):
         resp = client.request("PATCH", "/users/me", json_body=update_data, signed=True)
         if resp:
             print_response(resp)
+        else:
+            print("No response from server")
     else:
         print("Usage: me [update field=value...]")
 

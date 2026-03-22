@@ -1,2 +1,3 @@
 server/.env
 clients/pintest-cli/.env
+clients/pintest-cli/keys/

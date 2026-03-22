@@ -26,6 +26,8 @@ def request_cmd(args, client):
     resp = client.request("POST", "/contacts/request", json_body=payload, signed=True)
     if resp:
         print_response(resp)
+    else:
+        print("No response from server")
 
 @register("check")
 def check(args, client):
@@ -33,3 +35,5 @@ def check(args, client):
     resp = client.request("GET", "/contacts/check", signed=True)
     if resp:
         print_response(resp)
+    else:
+        print("No response from server")

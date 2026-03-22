@@ -75,16 +75,24 @@ def register_cmd(args, client):
         "public_key": pub_pem,
         "key_algorithm": "Ed25519"
     }
+    
     resp = client.request("POST", "/auth/register", json_body=payload, signed=False)
-    if resp and resp.status_code == 200:
+    if resp is None:
+        print("Registration failed: no response")
+        return
+
+    if resp.status_code == 200:
         print("Registration successful.")
         if client.profile.load_profile(login):
             print(f"Now using profile {login}.")
     else:
-        if resp:
-            print_response(resp)
-        else:
-            print("Registration failed (no response)")
+        print(f"Registration failed with status {resp.status_code}")
+        # Выводим тело ответа для диагностики
+        try:
+            error = resp.json()
+            print("Error details:", json.dumps(error, indent=2))
+        except:
+            print(resp.text)
 
 @register("use")
 def use(args, client):
