@@ -7,11 +7,11 @@ A service for... er... dating?
 The project is built on a modular principle: the server acts only as a layer between clients and the database. Clients (web, Telegram bot, desktop app, whatever) interact with the server through a single API.
 
 ```
-┌──────────────┐ ┌──────────────┐ ┌─────────────┐
-│ Clients │────▶│ Server │────▶│ MongoDB │
-│ (any) │ │ FastAPI │ │ │
-└─────────────┘ │ + Motor │ │ │
-└─────────────┘ └─────────────┘
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Clients    │────▶│    Server    │────▶│   MongoDB    │
+│    (any)     │     │   FastAPI    │     │              │
+│              │     │   + Motor    │     │              │
+└──────────────┘     └──────────────┘     └──────────────┘
 ```
 
 ## Tech Stack
