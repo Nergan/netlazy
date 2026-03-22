@@ -1,6 +1,6 @@
 # NetLazy
 
-A service for... er... dating?
+The service for... ee... dating?
 
 ## Architecture
 
