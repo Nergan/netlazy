@@ -98,6 +98,13 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     # Всё хорошо, сохраняем полезные данные в request.state
     request.state.login = login
     request.state.body_hash = body_hash
+    
+    # Обновляем last_online (асинхронно, не ждём)
+    await users_collection.update_one(
+        {"public.id": login},
+        {"$set": {"private.last_online": int(time.time())}}
+    )
+    
     return login
 
 
