@@ -38,42 +38,42 @@ This approach eliminates the need to transmit passwords or tokens and does not r
 
 ```json
 {
-"public": { // Public data, visible to everyone
-"id": "alice", // unique login
-"name": "Alice", // optional
-"sex": "female", // optional
-"desc": "...", // optional
-"img": "base64...", // optional
-"location": { // optional
-"precise": { // GeoJSON Point,
-"type": "Point",
-"coordinates": [37.6173, 55.7558]
-},
-"exemplary": ["Moscow"]
-},
-"tags": ["it", "coffee"] // optional
-},
-"protect": { // Data with a custom access level
-"contacts": [ // contacts array
-{"is_public": true, "contact": "telegram:@alice"}
-],
-"is_online": false
-},
-"private": { // For internal use only
-"public_key": "-----BEGIN PUBLIC KEY-----...", // public key
-"key_algorithm": "Ed25519",
-"requests": [ // incoming request queue
-{
-"request_id": "abc-123",
-"type": "swap",
-"from_id": "bob",
-"data": {"message": "hi"},
-"timestamp": 1712345678
-}
-],
-"created_at": 1712345678,
-"last_online": 1712345678
-}
+  "public": { // Public data, visible to everyone
+    "id": "alice", // unique login
+    "name": "Alice", // optional
+    "sex": "female", // optional
+    "desc": "...", // optional
+    "img": "base64...", // optional
+    "location": { // optional
+      "precise": { // GeoJSON Point
+        "type": "Point",
+        "coordinates": [37.6173, 55.7558]
+      },
+      "exemplary": ["Moscow"]
+    },
+    "tags": ["it", "coffee"] // optional
+  },
+  "protect": { // Data with a custom access level
+    "contacts": [ // contacts array
+      { "is_public": true, "contact": "telegram:@alice" }
+    ],
+    "is_online": false
+  },
+  "private": { // For internal use only
+    "public_key": "-----BEGIN PUBLIC KEY-----...", // public key
+    "key_algorithm": "Ed25519",
+    "requests": [ // incoming request queue
+      {
+        "request_id": "abc-123",
+        "type": "swap",
+        "from_id": "bob",
+        "data": { "message": "hi" },
+        "timestamp": 1712345678
+      }
+    ],
+    "created_at": 1712345678,
+    "last_online": 1712345678
+  }
 }
 ```
 
