@@ -8,7 +8,7 @@ The project is built on a modular principle: the server acts only as a layer bet
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Clients    │────▶│    Server    │────▶│   MongoDB    │
+│   Clients    │── ─▶│    Server    │───▶│   MongoDB    │
 │    (any)     │     │   FastAPI    │     │              │
 │              │     │   + Motor    │     │              │
 └──────────────┘     └──────────────┘     └──────────────┘
