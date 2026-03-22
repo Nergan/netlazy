@@ -14,7 +14,6 @@ class Location(BaseModel):
 class SexEnum(str, Enum):
     MALE = "male"
     FEMALE = "female"
-    OTHER = "other"
 
 class UserPublic(BaseModel):
     id: str  # логин
