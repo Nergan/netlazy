@@ -72,7 +72,8 @@ This approach eliminates the need to transmit passwords or tokens and does not r
       }
     ],
     "created_at": 1712345678,
-    "last_online": 1712345678
+    "last_online": 1712345678,
+    "last_nonce": "fe4bac2f4c4761d7ef1cfc8c4018f1071bc3b1bdb2f8a8d78de31ad2b9852f28"
   }
 }
 ```
