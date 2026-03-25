@@ -29,6 +29,13 @@ async def list_users(
         return UserPublicListResponse(items=items, total=total)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/me", response_model=UserPublic)
+async def get_my_profile(login: str = Depends(current_user_required)):
+    user = await users_service.get_user_by_id(login)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 @router.get("/{login}", response_model=UserPublic)
 async def get_user(login: str):
@@ -54,10 +61,3 @@ async def update_my_profile(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-@router.get("/me", response_model=UserPublic)
-async def get_my_profile(login: str = Depends(current_user_required)):
-    user = await users_service.get_user_by_id(login)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user

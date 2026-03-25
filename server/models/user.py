@@ -53,6 +53,7 @@ class UserPrivate(BaseModel):
     requests: List[dict] = Field(default_factory=list)
     created_at: int
     last_online: int
+    last_nonce: Optional[str] = None
 
 class UserInDB(BaseModel):
     public: UserPublic
