@@ -1,14 +1,19 @@
+# Ignore all .env files
+.env
+
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# pytest
+# Pytest cache
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
 
-server/.env
-clients/pintest-cli/.env
-clients/pintest-cli/keys/
+# Ignore all dot files and directories, but keep .gitignore
+.*
+!.gitignore
