@@ -42,7 +42,10 @@ def sign_request(
     Формирует заголовки подписи.
     Возвращает словарь с заголовками X-Login, X-Timestamp, X-Nonce, X-Body-Hash, X-Signature.
     """
-    body_hash = hashlib.sha256(body).hexdigest() if body else ""
+    # Если тело отсутствует, используем пустые байты
+    body_bytes = body if body is not None else b''
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+
     canonical = f"{method}\n{path}\n{timestamp}\n{nonce}\n{body_hash}"
     private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
     signature = private_key.sign(canonical.encode())

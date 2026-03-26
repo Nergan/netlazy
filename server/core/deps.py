@@ -2,10 +2,9 @@ import time
 import hashlib
 import asyncio
 from typing import Optional
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException
 from core.database import get_users_collection
 from services.crypto import verify_signature
-from core.config import settings
 
 SIGNATURE_EXPIRY = 300  # 5 минут
 
@@ -47,14 +46,11 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     if abs(now - timestamp) > SIGNATURE_EXPIRY:
         raise HTTPException(status_code=401, detail="Timestamp expired")
 
-    # Чтение тела и проверка body hash
-    body = await request.body()
+    # Используем сохранённое тело (middleware)
+    body = request.state.body
     body_hash = hashlib.sha256(body).hexdigest()
     if body_hash != body_hash_header:
         raise HTTPException(status_code=400, detail="Body hash mismatch")
-
-    # Сохраняем тело для дальнейшей обработки (FastAPI сможет его распарсить)
-    request._body = body
 
     # Получение пользователя и публичного ключа
     users_collection = await get_users_collection()
@@ -94,7 +90,6 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     )
 
     request.state.login = login
-    request.state.body_hash = body_hash
     return login
 
 
