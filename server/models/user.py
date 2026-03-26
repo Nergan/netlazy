@@ -1,8 +1,10 @@
+import imghdr
+import base64
+import re
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from enum import Enum
-import re
-import base64
+
 
 class LocationPrecise(BaseModel):
     type: str = "Point"
@@ -20,16 +22,28 @@ class LocationPrecise(BaseModel):
             raise ValueError('latitude must be between -90 and 90')
         return v
 
+
 class Location(BaseModel):
     precise: Optional[LocationPrecise] = None
     exemplary: Optional[List[str]] = None
+
+    @field_validator('exemplary')
+    @classmethod
+    def validate_exemplary_length(cls, v):
+        if v:
+            for item in v:
+                if len(item) > 64:
+                    raise ValueError('each exemplary location must be at most 64 characters')
+        return v
+
 
 class SexEnum(str, Enum):
     MALE = "male"
     FEMALE = "female"
 
+
 class UserPublic(BaseModel):
-    id: str  # логин
+    id: str
     name: Optional[str] = None
     dob: Optional[str] = None
     sex: Optional[SexEnum] = None
@@ -41,8 +55,37 @@ class UserPublic(BaseModel):
     @field_validator('id')
     @classmethod
     def validate_id(cls, v):
-        if not re.match(r'^[a-z0-9-]+$', v):
-            raise ValueError('id must contain only lowercase letters, digits, and hyphens')
+        if not (3 <= len(v) <= 32):
+            raise ValueError('id must be between 3 and 32 characters')
+        if not re.match(r'^[a-z0-9]+(-[a-z0-9]+)*$', v):
+            raise ValueError('id must contain only lowercase letters, digits, and hyphens, '
+                             'cannot start or end with hyphen, and cannot have consecutive hyphens')
+        return v
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        if v is not None:
+            if len(v) < 1 or len(v) > 64:
+                raise ValueError('name must be between 1 and 64 characters')
+        return v
+
+    @field_validator('desc')
+    @classmethod
+    def validate_desc(cls, v):
+        if v is not None and len(v) > 500:
+            raise ValueError('description must be at most 500 characters')
+        return v
+
+    @field_validator('tags')
+    @classmethod
+    def validate_tags(cls, v):
+        if v is not None:
+            if len(v) > 10:
+                raise ValueError('maximum 10 tags allowed')
+            for tag in v:
+                if len(tag) > 32:
+                    raise ValueError('each tag must be at most 32 characters')
         return v
 
     @field_validator('dob')
@@ -61,38 +104,47 @@ class UserPublic(BaseModel):
             img_data = base64.b64decode(v)
         except Exception:
             raise ValueError('invalid base64 image')
-        # Проверка размера (5 МБ)
+
         if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-        # Проверка типа (JPEG или PNG)
-        if img_data.startswith(b'\xff\xd8') or img_data.startswith(b'\x89PNG\r\n\x1a\n'):
-            return v
-        raise ValueError('unsupported image format, only JPEG and PNG allowed')
+
+        # Проверка типа через imghdr
+        img_type = imghdr.what(None, h=img_data)
+        if img_type not in ('jpeg', 'png'):
+            raise ValueError('unsupported image format, only JPEG and PNG allowed')
+
+        return v
+
 
 class ContactItem(BaseModel):
     is_public: bool
     contact: str
 
+
 class UserProtect(BaseModel):
     contacts: Optional[List[ContactItem]] = Field(default_factory=list)
     is_online: bool = False
 
+
 class UserPrivate(BaseModel):
-    public_key: str                     # публичный ключ в формате PEM
-    key_algorithm: str = "Ed25519"       # алгоритм подписи
+    public_key: str
+    key_algorithm: str = "Ed25519"
     requests: List[dict] = Field(default_factory=list)
     created_at: int
     last_online: int
-    last_nonce: Optional[str] = None     # поле больше не используется, но оставлено для совместимости
+    # last_nonce удалено
+
 
 class UserInDB(BaseModel):
     public: UserPublic
     protect: UserProtect = Field(default_factory=UserProtect)
     private: UserPrivate
 
+
 class UserPublicListResponse(BaseModel):
     items: List[UserPublic]
     total: int
+
 
 class UserProfileUpdate(BaseModel):
     name: Optional[str] = None
@@ -103,6 +155,32 @@ class UserProfileUpdate(BaseModel):
     location: Optional[Location] = None
     tags: Optional[List[str]] = None
 
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        if v is not None:
+            if len(v) < 1 or len(v) > 64:
+                raise ValueError('name must be between 1 and 64 characters')
+        return v
+
+    @field_validator('desc')
+    @classmethod
+    def validate_desc(cls, v):
+        if v is not None and len(v) > 500:
+            raise ValueError('description must be at most 500 characters')
+        return v
+
+    @field_validator('tags')
+    @classmethod
+    def validate_tags(cls, v):
+        if v is not None:
+            if len(v) > 10:
+                raise ValueError('maximum 10 tags allowed')
+            for tag in v:
+                if len(tag) > 32:
+                    raise ValueError('each tag must be at most 32 characters')
+        return v
+
     @field_validator('dob')
     @classmethod
     def validate_dob(cls, v):
@@ -119,8 +197,12 @@ class UserProfileUpdate(BaseModel):
             img_data = base64.b64decode(v)
         except Exception:
             raise ValueError('invalid base64 image')
+
         if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-        if img_data.startswith(b'\xff\xd8') or img_data.startswith(b'\x89PNG\r\n\x1a\n'):
-            return v
-        raise ValueError('unsupported image format, only JPEG and PNG allowed')
+
+        img_type = imghdr.what(None, h=img_data)
+        if img_type not in ('jpeg', 'png'):
+            raise ValueError('unsupported image format, only JPEG and PNG allowed')
+
+        return v
