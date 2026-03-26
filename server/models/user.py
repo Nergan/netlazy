@@ -108,7 +108,6 @@ class UserPublic(BaseModel):
         if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
 
-        # Проверка типа через imghdr
         img_type = imghdr.what(None, h=img_data)
         if img_type not in ('jpeg', 'png'):
             raise ValueError('unsupported image format, only JPEG and PNG allowed')
@@ -116,13 +115,7 @@ class UserPublic(BaseModel):
         return v
 
 
-class ContactItem(BaseModel):
-    is_public: bool
-    contact: str
-
-
 class UserProtect(BaseModel):
-    contacts: Optional[List[ContactItem]] = Field(default_factory=list)
     is_online: bool = False
 
 
@@ -130,9 +123,9 @@ class UserPrivate(BaseModel):
     public_key: str
     key_algorithm: str = "Ed25519"
     requests: List[dict] = Field(default_factory=list)
+    requests_size_bytes: int = 0                     # атомарно обновляемое поле размера
     created_at: int
     last_online: int
-    # last_nonce удалено
 
 
 class UserInDB(BaseModel):

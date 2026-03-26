@@ -12,7 +12,6 @@ class MongoDB:
 
 
 async def connect_to_mongo():
-    """Установка соединения с MongoDB."""
     logger.info("Connecting to MongoDB...")
     MongoDB.client = AsyncIOMotorClient(
         settings.mongodb_uri,
@@ -22,19 +21,18 @@ async def connect_to_mongo():
     MongoDB.db = MongoDB.client[settings.database_name]
     logger.info("Connected to MongoDB.")
 
+
 async def close_mongo_connection():
-    """Закрытие соединения."""
     if MongoDB.client:
         MongoDB.client.close()
         logger.info("Closed MongoDB connection.")
 
+
 async def get_users_collection():
-    """Возвращает коллекцию users."""
     return MongoDB.db["users"]
 
 
 async def create_indexes():
-    """Создание индексов для коллекции users."""
     users = await get_users_collection()
 
     await users.create_index("public.id", unique=True)
@@ -52,8 +50,14 @@ async def create_indexes():
     await users.create_index([("public.tags", 1), ("private.created_at", -1)])
     logger.debug("Compound index on (public.tags, private.created_at) created/verified.")
 
-    # Индекс для быстрой проверки дубликатов запросов
     await users.create_index("private.requests.request_id")
     logger.debug("Index on private.requests.request_id created/verified.")
+
+    await users.create_index([("private.requests.from_id", 1), ("private.requests.type", 1)])
+    logger.debug("Compound index on (private.requests.from_id, private.requests.type) created/verified.")
+
+    # Индекс для поля размера очереди (для оптимизации, не критично)
+    await users.create_index("private.requests_size_bytes")
+    logger.debug("Index on private.requests_size_bytes created/verified.")
 
     logger.info("All indexes are set up.")

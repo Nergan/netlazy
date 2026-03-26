@@ -112,11 +112,23 @@ class NetLazyClient:
         self._check_status(resp)
         return resp.json()
 
-    def check_requests(self) -> List[ContactRequestOut]:
-        resp = self._request("GET", "/contacts/check", signed=True)
+    def get_pending_requests(self) -> List[ContactRequestOut]:
+        """Получить список входящих запросов (без удаления)."""
+        resp = self._request("GET", "/contacts/requests", signed=True)
         self._check_status(resp)
         items = resp.json()
         return [ContactRequestOut(**item) for item in items]
+
+    def delete_request(self, request_id: str):
+        """Удалить конкретный запрос."""
+        resp = self._request("DELETE", f"/contacts/requests/{request_id}", signed=True)
+        self._check_status(resp)
+        # 204 No Content
+
+    # Для обратной совместимости: старый метод check_requests теперь тоже не удаляет
+    def check_requests(self) -> List[ContactRequestOut]:
+        """Устаревший метод. Используйте get_pending_requests() и delete_request()."""
+        return self.get_pending_requests()
 
     # ----- Внутренние методы -----
 
@@ -164,11 +176,9 @@ class NetLazyClient:
         response = self._session.request(method, url, **kwargs)
 
         if signed:
-            # Обновляем nonce, если ответ не 409 (Nonce conflict)
             if response.status_code == 409:
                 raise NonceConflictError("Nonce conflict, please retry")
             else:
-                # Nonce был использован (даже если ответ с ошибкой, кроме 409)
                 self.storage.update_nonce(self.auth.current_login, self._last_sent_nonce)
 
         return response

@@ -6,25 +6,20 @@ from collections import OrderedDict
 from fastapi import Request, HTTPException
 from core.database import get_users_collection
 from services.crypto import verify_signature
+from core.config import settings
 
-SIGNATURE_EXPIRY = 300  # 5 минут
-NONCE_CACHE_MAX_SIZE = 10_000  # максимальное количество nonce в кэше
+SIGNATURE_EXPIRY = 300
+NONCE_CACHE_MAX_SIZE = settings.nonce_cache_max_size
 
-# LRU-кэш использованных nonce
 _nonce_cache = OrderedDict()
 _nonce_lock = asyncio.Lock()
 
 
 def _clean_nonce_cache():
-    """Удаляет просроченные записи и ограничивает размер кэша."""
     now = time.time()
-    # Удаляем просроченные
     expired = [k for k, t in _nonce_cache.items() if t < now]
     for k in expired:
         del _nonce_cache[k]
-    # Ограничиваем размер
-    while len(_nonce_cache) > NONCE_CACHE_MAX_SIZE:
-        _nonce_cache.popitem(last=False)
 
 
 async def get_current_user(request: Request, required: bool = True) -> Optional[str]:
@@ -43,6 +38,9 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     if not all([login, timestamp_str, nonce, signature_b64]):
         raise HTTPException(status_code=401, detail="Incomplete signature headers")
 
+    if nonce and len(nonce) > 128:
+        raise HTTPException(status_code=400, detail="Nonce too long")
+
     try:
         timestamp = int(timestamp_str)
     except ValueError:
@@ -52,13 +50,11 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     if abs(now - timestamp) > SIGNATURE_EXPIRY:
         raise HTTPException(status_code=401, detail="Timestamp expired")
 
-    # Используем сохранённое тело (middleware)
     body = request.state.body
     body_hash = hashlib.sha256(body).hexdigest()
     if body_hash != body_hash_header:
         raise HTTPException(status_code=400, detail="Body hash mismatch")
 
-    # Получение пользователя и публичного ключа
     users_collection = await get_users_collection()
     user = await users_collection.find_one({"public.id": login})
     if not user:
@@ -67,14 +63,12 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     public_key_pem = user["private"]["public_key"]
     algorithm = user["private"].get("key_algorithm", "Ed25519")
 
-    # Формирование канонической строки (включая query)
     method = request.method
     path = request.url.path
     query = request.url.query
     full_path = path + (f"?{query}" if query else "")
     canonical = f"{method}\n{full_path}\n{timestamp_str}\n{nonce}\n{body_hash}"
 
-    # Проверка подписи
     try:
         valid = await verify_signature(public_key_pem, canonical.encode(), signature_b64, algorithm)
     except Exception as e:
@@ -83,15 +77,15 @@ async def get_current_user(request: Request, required: bool = True) -> Optional[
     if not valid:
         raise HTTPException(status_code=401, detail="Invalid signature")
 
-    # Проверка nonce (replay‑attack)
     cache_key = f"{login}:{nonce}"
     async with _nonce_lock:
         _clean_nonce_cache()
         if cache_key in _nonce_cache:
             raise HTTPException(status_code=409, detail="Nonce already used")
+        if len(_nonce_cache) >= NONCE_CACHE_MAX_SIZE:
+            raise HTTPException(status_code=429, detail="Too many requests, try again later")
         _nonce_cache[cache_key] = time.time() + SIGNATURE_EXPIRY
 
-    # Обновляем last_online
     await users_collection.update_one(
         {"public.id": login},
         {"$set": {"private.last_online": now}}
