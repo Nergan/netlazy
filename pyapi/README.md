@@ -2,7 +2,7 @@
 
 ### 1. Client Initialization
 ```python
-from api import NetLazyClient
+from pyapi import NetLazyClient
 
 client = NetLazyClient("http://localhost:8000")
 ```
@@ -41,7 +41,7 @@ print(me.name)
 
 **Update your profile** (requires authentication)
 ```python
-from api import UserProfileUpdate
+from pyapi import UserProfileUpdate
 
 update = UserProfileUpdate(name="<name>", tags=["it", "coffee"])
 updated = client.update_my_profile(update)

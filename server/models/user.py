@@ -2,10 +2,23 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from enum import Enum
 import re
+import base64
 
 class LocationPrecise(BaseModel):
     type: str = "Point"
     coordinates: List[float]
+
+    @field_validator('coordinates')
+    @classmethod
+    def validate_coordinates(cls, v):
+        if len(v) != 2:
+            raise ValueError('coordinates must be [longitude, latitude]')
+        lon, lat = v
+        if not (-180 <= lon <= 180):
+            raise ValueError('longitude must be between -180 and 180')
+        if not (-90 <= lat <= 90):
+            raise ValueError('latitude must be between -90 and 90')
+        return v
 
 class Location(BaseModel):
     precise: Optional[LocationPrecise] = None
@@ -25,6 +38,13 @@ class UserPublic(BaseModel):
     location: Optional[Location] = None
     tags: Optional[List[str]] = None
 
+    @field_validator('id')
+    @classmethod
+    def validate_id(cls, v):
+        if not re.match(r'^[a-z0-9-]+$', v):
+            raise ValueError('id must contain only lowercase letters, digits, and hyphens')
+        return v
+
     @field_validator('dob')
     @classmethod
     def validate_dob(cls, v):
@@ -34,10 +54,20 @@ class UserPublic(BaseModel):
 
     @field_validator('img')
     @classmethod
-    def validate_img_size(cls, v):
-        if v and len(v) > 7_000_000:
+    def validate_img(cls, v):
+        if v is None:
+            return v
+        try:
+            img_data = base64.b64decode(v)
+        except Exception:
+            raise ValueError('invalid base64 image')
+        # Проверка размера (5 МБ)
+        if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-        return v
+        # Проверка типа (JPEG или PNG)
+        if img_data.startswith(b'\xff\xd8') or img_data.startswith(b'\x89PNG\r\n\x1a\n'):
+            return v
+        raise ValueError('unsupported image format, only JPEG and PNG allowed')
 
 class ContactItem(BaseModel):
     is_public: bool
@@ -53,7 +83,7 @@ class UserPrivate(BaseModel):
     requests: List[dict] = Field(default_factory=list)
     created_at: int
     last_online: int
-    last_nonce: Optional[str] = None
+    last_nonce: Optional[str] = None     # поле больше не используется, но оставлено для совместимости
 
 class UserInDB(BaseModel):
     public: UserPublic
@@ -82,7 +112,15 @@ class UserProfileUpdate(BaseModel):
 
     @field_validator('img')
     @classmethod
-    def validate_img_size(cls, v):
-        if v and len(v) > 7_000_000:
+    def validate_img(cls, v):
+        if v is None:
+            return v
+        try:
+            img_data = base64.b64decode(v)
+        except Exception:
+            raise ValueError('invalid base64 image')
+        if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-        return v
+        if img_data.startswith(b'\xff\xd8') or img_data.startswith(b'\x89PNG\r\n\x1a\n'):
+            return v
+        raise ValueError('unsupported image format, only JPEG and PNG allowed')
