@@ -2,14 +2,11 @@ import time
 from models.user import UserInDB, UserPublic, UserProtect, UserPrivate
 from core.database import get_users_collection
 from services.crypto import validate_public_key
+from pymongo.errors import DuplicateKeyError
 
 
 async def register_user(login: str, public_key: str, key_algorithm: str = "Ed25519"):
     users_collection = await get_users_collection()
-
-    existing = await users_collection.find_one({"public.id": login})
-    if existing:
-        raise ValueError("Login already exists")
 
     if not validate_public_key(public_key, key_algorithm):
         raise ValueError("Invalid public key format or algorithm mismatch")
@@ -27,7 +24,10 @@ async def register_user(login: str, public_key: str, key_algorithm: str = "Ed255
             last_online=current_time
         )
     )
-    await users_collection.insert_one(new_user.model_dump(by_alias=True))
+    try:
+        await users_collection.insert_one(new_user.model_dump(by_alias=True))
+    except DuplicateKeyError:
+        raise ValueError("Login already exists")
     return login
 
 

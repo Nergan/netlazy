@@ -3,6 +3,7 @@ from typing import Optional, List
 from models.user import UserPublic, UserProfileUpdate
 from core.database import get_users_collection
 
+
 async def get_user_by_id(login: str) -> Optional[UserPublic]:
     users_collection = await get_users_collection()
     user = await users_collection.find_one({"public.id": login}, {"public": 1, "_id": 0})
@@ -13,11 +14,12 @@ async def get_user_by_id(login: str) -> Optional[UserPublic]:
         public_data["img"] = base64.b64encode(public_data["img"]).decode('ascii')
     return UserPublic(**public_data)
 
+
 async def update_user_profile(login: str, update_data: dict) -> Optional[UserPublic]:
     users_collection = await get_users_collection()
     if "img" in update_data and update_data["img"] is not None:
         try:
-            update_data["img"] = base64.b64decode(update_data["img"])
+            update_data["img"] = base64.b64decode(update_data["img"], validate=True)
         except Exception:
             raise ValueError("Invalid base64 image")
     update_dict = {f"public.{k}": v for k, v in update_data.items()}
@@ -32,6 +34,7 @@ async def update_user_profile(login: str, update_data: dict) -> Optional[UserPub
     if public_data.get("img") and isinstance(public_data["img"], bytes):
         public_data["img"] = base64.b64encode(public_data["img"]).decode('ascii')
     return UserPublic(**public_data)
+
 
 async def list_users(
     current_login: Optional[str],

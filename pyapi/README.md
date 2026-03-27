@@ -71,15 +71,20 @@ for user in result.items:
 client.send_contact_request(
     target_id="<id>",
     req_type="swap",  # "swap", "give", "get"
-    data={"message": "Hello!"}  # optional
+    data={"message": "Hello!"}  # required for "give"
 )
 ```
 
-**Check incoming requests** (requires authentication)
+**Get the list of incoming requests** (requires authentication)
 ```python
-requests = client.check_requests()
+requests = client.get_requests()  # returns list of pending requests
 for req in requests:
     print(req.from_id, req.type, req.data)
+```
+
+**Delete a processed request** (requires authentication)
+```python
+client.delete_request(request_id)  # after processing, remove it from the queue
 ```
 
 ### 5. Exceptions
@@ -109,5 +114,8 @@ print(f"Found: {users.total}")
 client.send_contact_request("bob", "swap")
 
 # Check incoming requests
-incoming = client.check_requests()
-```
+incoming = client.get_requests()
+for req in incoming:
+    print(f"From {req.from_id}: {req.type}")
+    # after processing:
+    client.delete_request(req.request_id)

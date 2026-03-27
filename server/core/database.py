@@ -1,7 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from logging import getLogger
-
-from .config import settings
+from core.config import get_settings
 
 logger = getLogger(__name__)
 
@@ -13,6 +12,7 @@ class MongoDB:
 
 async def connect_to_mongo():
     logger.info("Connecting to MongoDB...")
+    settings = get_settings()
     MongoDB.client = AsyncIOMotorClient(
         settings.mongodb_uri,
         tls=True,
@@ -56,7 +56,6 @@ async def create_indexes():
     await users.create_index([("private.requests.from_id", 1), ("private.requests.type", 1)])
     logger.debug("Compound index on (private.requests.from_id, private.requests.type) created/verified.")
 
-    # Индекс для поля размера очереди (для оптимизации, не критично)
     await users.create_index("private.requests_size_bytes")
     logger.debug("Index on private.requests_size_bytes created/verified.")
 

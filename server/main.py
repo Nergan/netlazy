@@ -1,10 +1,9 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.database import connect_to_mongo, close_mongo_connection, create_indexes
 from core.rate_limit import RateLimitMiddleware
 from routers import auth, users, contacts
-
-app = FastAPI(title="NetLazy API")
 
 
 class CacheBodyMiddleware(BaseHTTPMiddleware):
@@ -18,19 +17,20 @@ class CacheBodyMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(CacheBodyMiddleware)
-app.add_middleware(RateLimitMiddleware)
-
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     await connect_to_mongo()
     await create_indexes()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
+    yield
+    # Shutdown
     await close_mongo_connection()
+
+
+app = FastAPI(title="NetLazy API", lifespan=lifespan)
+
+app.add_middleware(CacheBodyMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.get("/")

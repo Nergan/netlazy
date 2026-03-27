@@ -4,6 +4,7 @@ from core.deps import current_user_required
 
 router = APIRouter()
 
+
 @router.post("/register")
 async def register(
     login: str = Body(...),
@@ -21,11 +22,12 @@ async def register(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/change-key")
 async def change_key(
     new_public_key: str = Body(...),
     new_algorithm: str = Body("Ed25519"),
-    login: str = Depends(current_user_required)  # подпись старым ключом
+    login: str = Depends(current_user_required)
 ):
     """
     Смена ключа (требуется подпись старым ключом).

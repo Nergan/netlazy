@@ -3,10 +3,10 @@ from cryptography.hazmat.primitives.asymmetric import ed25519, rsa, padding
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 
+
 async def verify_signature(public_key_pem: str, message: bytes, signature_b64: str, algorithm: str = "Ed25519") -> bool:
-    """Проверяет подпись (асинхронная обёртка, но внутри синхронный код)."""
     try:
-        signature = base64.b64decode(signature_b64)
+        signature = base64.b64decode(signature_b64, validate=True)
     except:
         return False
 
@@ -35,11 +35,8 @@ async def verify_signature(public_key_pem: str, message: bytes, signature_b64: s
     except Exception:
         return False
 
+
 def validate_public_key(public_key_pem: str, expected_algorithm: str) -> bool:
-    """
-    Проверяет, что переданный PEM-ключ соответствует ожидаемому алгоритму.
-    Возвращает True, если ключ корректен и имеет нужный тип.
-    """
     try:
         key = serialization.load_pem_public_key(public_key_pem.encode())
         if expected_algorithm == "Ed25519":

@@ -58,12 +58,9 @@ async def delete_request(
     """
     Удалить конкретный входящий запрос по его request_id.
     """
-    try:
-        deleted = await contacts_service.delete_request(login, request_id)
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Request not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    deleted = await contacts_service.delete_request(login, request_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Request not found")
 
 
 @router.get("/check", response_model=List[ContactRequestOut])

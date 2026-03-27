@@ -6,6 +6,7 @@ from core.deps import current_user_required, current_user_optional
 
 router = APIRouter()
 
+
 @router.get("/list", response_model=UserPublicListResponse)
 async def list_users(
     tags: Optional[List[str]] = Query(None),
@@ -29,7 +30,8 @@ async def list_users(
         return UserPublicListResponse(items=items, total=total)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.get("/me", response_model=UserPublic)
 async def get_my_profile(login: str = Depends(current_user_required)):
     user = await users_service.get_user_by_id(login)
@@ -37,12 +39,14 @@ async def get_my_profile(login: str = Depends(current_user_required)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+
 @router.get("/{login}", response_model=UserPublic)
 async def get_user(login: str):
     user = await users_service.get_user_by_id(login)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
 
 @router.patch("/me", response_model=UserPublic)
 async def update_my_profile(

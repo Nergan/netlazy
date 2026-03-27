@@ -5,10 +5,18 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from enum import Enum
 
+RESERVED_IDS = {"me", "list"}
 
 class LocationPrecise(BaseModel):
     type: str = "Point"
     coordinates: List[float]
+
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v):
+        if v != "Point":
+            raise ValueError('type must be "Point"')
+        return v
 
     @field_validator('coordinates')
     @classmethod
@@ -57,6 +65,8 @@ class UserPublic(BaseModel):
     def validate_id(cls, v):
         if not (3 <= len(v) <= 32):
             raise ValueError('id must be between 3 and 32 characters')
+        if v in RESERVED_IDS:
+            raise ValueError(f'id "{v}" is reserved')
         if not re.match(r'^[a-z0-9]+(-[a-z0-9]+)*$', v):
             raise ValueError('id must contain only lowercase letters, digits, and hyphens, '
                              'cannot start or end with hyphen, and cannot have consecutive hyphens')
@@ -101,17 +111,14 @@ class UserPublic(BaseModel):
         if v is None:
             return v
         try:
-            img_data = base64.b64decode(v)
+            img_data = base64.b64decode(v, validate=True)
         except Exception:
             raise ValueError('invalid base64 image')
-
         if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-
         img_type = imghdr.what(None, h=img_data)
         if img_type not in ('jpeg', 'png'):
             raise ValueError('unsupported image format, only JPEG and PNG allowed')
-
         return v
 
 
@@ -123,7 +130,7 @@ class UserPrivate(BaseModel):
     public_key: str
     key_algorithm: str = "Ed25519"
     requests: List[dict] = Field(default_factory=list)
-    requests_size_bytes: int = 0                     # атомарно обновляемое поле размера
+    requests_size_bytes: int = 0 
     created_at: int
     last_online: int
 
@@ -187,15 +194,12 @@ class UserProfileUpdate(BaseModel):
         if v is None:
             return v
         try:
-            img_data = base64.b64decode(v)
+            img_data = base64.b64decode(v, validate=True)
         except Exception:
             raise ValueError('invalid base64 image')
-
         if len(img_data) > 5 * 1024 * 1024:
             raise ValueError('image too large, max 5MB')
-
         img_type = imghdr.what(None, h=img_data)
         if img_type not in ('jpeg', 'png'):
             raise ValueError('unsupported image format, only JPEG and PNG allowed')
-
         return v
