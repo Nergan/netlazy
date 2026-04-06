@@ -1,0 +1,25 @@
+### Server side test results
+
+<pre style="background: #0a0e0a; color: #00ff66; font-family: monospace; padding: 12px;">
+PASSED tests/test_auth.py::test_register_success                                                       [  4%]
+PASSED tests/test_auth.py::test_register_duplicate_login                                               [  9%]
+PASSED tests/test_auth.py::test_register_invalid_public_key                                            [ 14%]
+PASSED tests/test_auth.py::test_change_key_success                                                     [ 19%]
+PASSED tests/test_auth.py::test_change_key_requires_auth                                               [ 23%]
+PASSED tests/test_contacts.py::test_send_swap_request                                                  [ 28%]
+PASSED tests/test_contacts.py::test_send_duplicate_swap_request                                        [ 33%]
+PASSED tests/test_contacts.py::test_delete_request                                                     [ 38%]
+SKIPPED tests/test_contacts.py::test_request_queue_size_limit (Requires modification of global sta...) [ 42%]
+PASSED tests/test_crypto.py::test_verify_signature_valid                                               [ 47%]
+PASSED tests/test_crypto.py::test_verify_signature_invalid                                             [ 52%]
+PASSED tests/test_deps.py::test_missing_headers                                                        [ 57%]
+PASSED tests/test_deps.py::test_expired_timestamp                                                      [ 61%]
+PASSED tests/test_deps.py::test_reused_nonce                                                           [ 66%]
+SKIPPED tests/test_rate_limit.py::test_rate_limit (Rate limit is disabled in test environment (RAT...) [ 71%]
+PASSED tests/test_users.py::test_get_user_public                                                       [ 76%]
+PASSED tests/test_users.py::test_get_my_profile                                                        [ 80%]
+PASSED tests/test_users.py::test_update_profile                                                        [ 85%]
+PASSED tests/test_users.py::test_update_profile_invalid_image                                          [ 90%]
+PASSED tests/test_users.py::test_list_users_pagination                                                 [ 95%]
+PASSED tests/test_users.py::test_list_users_tag_filter                                                 [100%]
+</pre>
