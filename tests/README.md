@@ -1,4 +1,4 @@
-### Server side test results
+### Web API Test Results
 
 ```console
 tests/test_auth.py::test_register_success PASSED                                                       [  4%]
