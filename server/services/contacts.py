@@ -23,31 +23,36 @@ async def get_pending_requests(login: str) -> List[ContactRequestOut]:
 
 
 async def delete_request(login: str, request_id: str) -> bool:
+    import json
     users_collection = await get_users_collection()
-    # Атомарно удаляем элемент и возвращаем его для вычисления размера
-    result = await users_collection.find_one_and_update(
-        {"public.id": login, "private.requests.request_id": request_id},
-        {"$pull": {"private.requests": {"request_id": request_id}}},
-        projection={"private.requests": {"$elemMatch": {"request_id": request_id}}},
-        return_document=False
+    # Получаем весь документ, чтобы найти удаляемый элемент
+    user = await users_collection.find_one(
+        {"public.id": login},
+        {"private.requests": 1}
     )
-    if not result:
+    if not user:
         return False
-
-    # Находим удалённый элемент
     removed = None
-    for req in result.get("private", {}).get("requests", []):
+    requests = user.get("private", {}).get("requests", [])
+    for req in requests:
         if req.get("request_id") == request_id:
             removed = req
             break
-    if removed:
-        # Вычисляем размер удалённого элемента
-        removed_size = len(json.dumps(removed, ensure_ascii=False).encode('utf-8'))
-        # Уменьшаем счётчик размера
-        await users_collection.update_one(
-            {"public.id": login},
-            {"$inc": {"private.requests_size_bytes": -removed_size}}
-        )
+    if not removed:
+        return False
+    removed_size = len(json.dumps(removed, ensure_ascii=False).encode('utf-8'))
+    # Атомарно удаляем элемент
+    result = await users_collection.update_one(
+        {"public.id": login},
+        {"$pull": {"private.requests": {"request_id": request_id}}}
+    )
+    if result.modified_count == 0:
+        return False
+    # Уменьшаем счётчик размера
+    await users_collection.update_one(
+        {"public.id": login},
+        {"$inc": {"private.requests_size_bytes": -removed_size}}
+    )
     return True
 
 
