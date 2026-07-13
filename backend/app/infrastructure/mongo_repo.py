@@ -269,14 +269,19 @@ class MongoHandshakeRepository(HandshakeRepository):
         return [self._to_domain(doc) async for doc in cursor]
 
     async def get_interacted_user_ids(self, user_id: str) -> List[str]:
-        # Strict logic: NEVER return interactions in feed even if soft-deleted
-        cursor = db_instance.handshakes_collection.find(
-            {"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]}
-        )
+        # Exclude other users only if there is an active interaction that user_id has NOT soft-deleted
+        cursor = db_instance.handshakes_collection.find({
+            "$or": [
+                {"sender_id": user_id, "sender_deleted": {"$ne": True}},
+                {"receiver_id": user_id, "receiver_deleted": {"$ne": True}}
+            ]
+        })
         interacted = set()
         async for doc in cursor:
-            if doc["sender_id"] != user_id: interacted.add(doc["sender_id"])
-            if doc["receiver_id"] != user_id: interacted.add(doc["receiver_id"])
+            if doc["sender_id"] == user_id:
+                interacted.add(doc["receiver_id"])
+            else:
+                interacted.add(doc["sender_id"])
         return list(interacted)
 
     async def delete_for_user(self, user_id: str) -> None:

@@ -20,7 +20,7 @@ class AuthService:
         self._user_repo = user_repo
         self._nonce_repo = nonce_repo
 
-    async def register_user(self, public_key_pem: str) -> User:
+    async def register_user(self, public_key_pem: str, ip: str = None, fingerprint: str = None) -> User:
         try:
             user_id = crypto_adapter.derive_user_id(public_key_pem)
         except crypto_adapter.InvalidPublicKeyError as e:
@@ -30,6 +30,8 @@ class AuthService:
             user_id=user_id,
             public_key_pem=public_key_pem,
             created_at=datetime.now(timezone.utc),
+            known_ips=[ip] if ip else [],
+            known_fingerprints=[fingerprint] if fingerprint else []
         )
         await self._user_repo.create(user) 
         return user

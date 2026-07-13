@@ -18,13 +18,11 @@
 
         <div class="telegram-grid" v-if="profile.media && profile.media.length > 0">
           <div class="media-thumb" v-for="m in profile.media" :key="m.url" @click="handleMediaClick(profile, m)">
-             <template v-if="!m.isLoaded">
-               <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
-                 <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
-               </div>
-             </template>
-             <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-             <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+             <div v-if="!m.isLoaded" class="media-loader">
+               <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+             </div>
+             <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" :class="{'is-blurred': m.blur}">
+             <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
           </div>
         </div>
         

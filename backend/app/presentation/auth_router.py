@@ -46,9 +46,11 @@ async def check_footprint(request: Request):
     return {"has_accounts": doc is not None}
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserRegisterResponse, dependencies=[Depends(verify_pow)])
-async def register(user_data: UserRegisterRequest):
+async def register(request: Request, user_data: UserRegisterRequest):
+    from app.presentation.dependencies import _get_client_footprint
+    ip, fingerprint = _get_client_footprint(request)
     try:
-        user = await auth_service.register_user(user_data.public_key)
+        user = await auth_service.register_user(user_data.public_key, ip=ip, fingerprint=fingerprint)
     except InvalidPublicKeyError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except UserAlreadyExistsError:

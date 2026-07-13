@@ -64,14 +64,12 @@
                @dragend="dragEnd"
                @click="!m.isUploading && openLightbox(m)">
             
-            <template v-if="m.isUploading || !m.isLoaded">
-              <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
-                <i class="bi bi-arrow-repeat spin" style="font-size: 2rem; color: var(--text-muted);"></i>
-              </div>
-            </template>
+            <div v-if="m.isUploading || !m.isLoaded" class="media-loader">
+              <i class="bi bi-arrow-repeat spin" style="font-size: 2rem; color: var(--text-muted);"></i>
+            </div>
             
-            <img v-if="m.media_type === 'image'" v-show="!m.isUploading && m.isLoaded" @load="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-            <video v-else-if="m.media_type === 'video'" v-show="!m.isUploading && m.isLoaded" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+            <img v-if="m.media_type === 'image'" v-show="!m.isUploading && m.isLoaded" @load="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" :class="{'is-blurred': m.blur}">
+            <video v-else-if="m.media_type === 'video'" v-show="!m.isUploading && m.isLoaded" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
             
             <div class="media-remove" v-show="m.isUploading || m.isLoaded" @click.stop="!m.isDeleting && removeMedia(m, idx)">
               <i class="bi" :class="m.isDeleting ? 'bi-hourglass-split spin' : 'bi-x'"></i>

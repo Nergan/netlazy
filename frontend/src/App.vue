@@ -121,7 +121,7 @@
              {{ store.t('vault_desc') }}
            </div>
            
-           <div style="display:flex; gap:1.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+           <div style="display:flex; gap:1rem; margin-bottom: 2rem; flex-wrap: wrap;">
               <button class="footer-action" @click="copyKey"><i class="bi bi-clipboard"></i> {{ store.t('copy_raw') }}</button>
               <button class="footer-action" style="color: var(--accent-earth);" @click="store.logout"><i class="bi bi-box-arrow-right"></i> {{ store.t('log_out') }}</button>
               <button class="footer-action" style="color: var(--accent-info);" @click="rotateIdentityKey"><i class="bi bi-arrow-repeat"></i> {{ store.t('regenerate_key') }}</button>
@@ -197,6 +197,18 @@ onMounted(async () => {
       const res = await api.get('/auth/footprint-check')
       hasExistingAccounts.value = res.data.has_accounts
     } catch(e) {}
+  }
+})
+
+// Dynamic watcher to re-evaluate accounts check if login status changes (e.g. logouts / deletions)
+watch(() => store.state.isRegistered, async (newVal) => {
+  if (!newVal) {
+    try {
+      const res = await api.get('/auth/footprint-check')
+      hasExistingAccounts.value = res.data.has_accounts
+    } catch(e) {
+      hasExistingAccounts.value = false
+    }
   }
 })
 
