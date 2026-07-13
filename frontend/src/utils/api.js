@@ -78,8 +78,12 @@ api.interceptors.response.use(response => response, error => {
     if (error.response && [401, 403].includes(error.response.status)) {
         const store = useStore();
         if (store.state.isRegistered) {
-            store.logout();
-            store.addToast(error.response.status === 403 ? "Account Restricted" : "Session Expired", "bi-exclamation-triangle");
+            if (error.response.status === 403) {
+                store.state.isBanned = true;
+            } else {
+                store.logout();
+                store.addToast("Session Expired", "bi-exclamation-triangle");
+            }
         }
     }
     return Promise.reject(error);

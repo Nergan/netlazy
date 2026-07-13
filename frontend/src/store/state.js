@@ -7,6 +7,7 @@ const STORAGE_KEY = 'netlazy_state';
 
 const defaultState = {
     isRegistered: false,
+    isBanned: false,
     currentView: 'editor',
     theme: 'dark',
     lang: 'en',
@@ -61,11 +62,11 @@ export function useStore() {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                ['isRegistered', 'currentView', 'theme', 'lang', 'sidebarWidth', 'workspaceWidth', 'isWorkspaceCollapsed', 'inboxSplit', 'userId', 'privateKeyPem', 'publicKeyPem'].forEach(k => {
+                ['isRegistered', 'isBanned', 'currentView', 'theme', 'lang', 'sidebarWidth', 'workspaceWidth', 'isWorkspaceCollapsed', 'inboxSplit', 'userId', 'privateKeyPem', 'publicKeyPem'].forEach(k => {
                     if (parsed[k] !== undefined) state[k] = parsed[k];
                 });
 
-                if (state.isRegistered && state.privateKeyPem) {
+                if (state.isRegistered && state.privateKeyPem && !state.isBanned) {
                     const keys = await loadPrivateKey(state.privateKeyPem);
                     state.keyPair = keys.keyPair;
                     
@@ -80,13 +81,13 @@ export function useStore() {
     }
 
     watch(() => [
-        state.isRegistered, state.currentView, state.theme, state.lang,
+        state.isRegistered, state.isBanned, state.currentView, state.theme, state.lang,
         state.sidebarWidth, state.workspaceWidth, state.isWorkspaceCollapsed, state.inboxSplit,
         state.userId, state.privateKeyPem, state.publicKeyPem
     ], () => {
         try {
             const saveObj = {
-                isRegistered: state.isRegistered, currentView: state.currentView,
+                isRegistered: state.isRegistered, isBanned: state.isBanned, currentView: state.currentView,
                 theme: state.theme, lang: state.lang,
                 sidebarWidth: state.sidebarWidth, workspaceWidth: state.workspaceWidth,
                 isWorkspaceCollapsed: state.isWorkspaceCollapsed, inboxSplit: state.inboxSplit,
@@ -148,6 +149,7 @@ export function useStore() {
             state.userId = keys.userId;
             state.keyPair = keys.keyPair;
             state.isRegistered = true;
+            state.currentView = 'vault';
             
             await fetchTags();
             await fetchMyProfile();
@@ -199,6 +201,7 @@ export function useStore() {
 
     function logout() {
         state.isRegistered = false;
+        state.isBanned = false;
         state.userId = null;
         state.privateKeyPem = null;
         state.publicKeyPem = null;
@@ -274,7 +277,7 @@ export function useStore() {
     if (state.theme === 'light') document.body.classList.add('light-theme');
 
     instance = {
-        state, addToast, toggleTheme, cycleLang, t, createAccount, loginWithKey, logout, saveProfile, fetchTags, deleteAccount, rotateKey, fetchInbox
+        state, addToast, toggleTheme, cycleLang, t, showConfirm, createAccount, loginWithKey, logout, saveProfile, fetchTags, deleteAccount, rotateKey, fetchInbox
     };
     return instance;
 }

@@ -14,6 +14,7 @@ class Database:
     handshakes_collection = None
     challenges_collection = None
     bans_collection = None
+    logs_collection = None
 
 db_instance = Database()
 
@@ -102,6 +103,7 @@ async def connect_to_mongo():
     db_instance.handshakes_collection = db_instance.db.handshakes
     db_instance.challenges_collection = db_instance.db.challenges
     db_instance.bans_collection = db_instance.db.bans
+    db_instance.logs_collection = db_instance.db.logs
 
     # Explicit configuration of all active schema indexes
     definitions = {

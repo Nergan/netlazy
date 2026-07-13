@@ -228,7 +228,7 @@ body.light-theme .audio-minimal { filter: none; }
 .tag-scroll-area::-webkit-scrollbar { display: none; }
 
 /* CARDS MASONRY */
-.grid { column-width: 280px; column-gap: 1.5rem; width: 100%; padding-top: 0.5rem; } /* Shift top profiles down slightly to fully reveal card shadows and borders */
+.grid { column-width: 280px; column-gap: 1.5rem; width: 100%; padding-top: 1.5rem; } /* Shift top profiles down slightly to fully reveal card shadows and borders */
 .card { display: inline-flex; flex-direction: column; width: 100%; margin-bottom: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; gap: 0.8rem; break-inside: avoid; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: var(--shadow-sm); }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 

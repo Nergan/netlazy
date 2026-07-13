@@ -216,7 +216,7 @@ class MongoProfileRepository(ProfileRepository):
     def _contact_from_doc(self, d: dict) -> Contact: return Contact(type=d["type"], value=d["value"], is_private=d.get("is_private", True))
 
 
-class MongoHandshakeRepository(MongoHandshakeRepository):
+class MongoHandshakeRepository(HandshakeRepository):
     async def create(self, handshake: Handshake) -> None:
         await db_instance.handshakes_collection.insert_one(self._to_doc(handshake))
 

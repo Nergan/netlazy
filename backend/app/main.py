@@ -1,6 +1,8 @@
 import logging
 import mimetypes
 import os
+import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -31,14 +33,38 @@ class SensitiveRouteFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(SensitiveRouteFilter())
 
+class MongoLogHandler(logging.Handler):
+    def emit(self, record):
+        from app.database import db_instance
+        if db_instance.logs_collection is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+            
+        log_doc = {
+            "timestamp": datetime.fromtimestamp(record.created, timezone.utc),
+            "level": record.levelname,
+            "name": record.name,
+            "message": self.format(record)
+        }
+        loop.create_task(db_instance.logs_collection.insert_one(log_doc))
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    
+    mongo_handler = MongoLogHandler()
+    mongo_handler.setLevel(logging.INFO)
+    mongo_handler.setFormatter(logging.Formatter('%(message)s'))
+    logging.getLogger().addHandler(mongo_handler)
 
     synced_count = await tag_service.sync_from_yaml(settings.tags_yaml_path)
     logging.info(f"Tag registry synced: {synced_count} tags loaded from {settings.tags_yaml_path}")
 
     yield
+    logging.getLogger().removeHandler(mongo_handler)
     await close_mongo_connection()
 
 app = FastAPI(title="netlazy API", lifespan=lifespan)

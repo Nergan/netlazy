@@ -111,10 +111,11 @@ async def upload_media(
 @router.delete("/me/media", response_model=ProfileResponse)
 async def remove_media(
     url: str,
+    index: Optional[int] = None,
     user: User = Depends(verify_request_signature),
 ):
     try:
-        profile = await profile_service.remove_media(user.user_id, url)
+        profile = await profile_service.remove_media(user.user_id, url, index)
     except MediaNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _to_response(profile)
@@ -128,10 +129,11 @@ async def clear_audio(user: User = Depends(verify_request_signature)):
 async def set_media_blur(
     url: str,
     blur: bool,
+    index: Optional[int] = None,
     user: User = Depends(verify_request_signature),
 ):
     try:
-        profile = await profile_service.set_media_blur(user.user_id, url, blur)
+        profile = await profile_service.set_media_blur(user.user_id, url, blur, index)
     except MediaNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _to_response(profile)

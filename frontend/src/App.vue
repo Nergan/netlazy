@@ -1,7 +1,26 @@
 <template>
   <div id="app-container">
+    
+    <!-- Banned State -->
+    <div v-if="store.state.isBanned" class="welcome-container">
+      <div class="welcome-box">
+        <h1 class="welcome-brand" style="color: var(--accent-danger);">banned</h1>
+        <p class="welcome-desc">{{ store.t('account_banned') }}</p>
+        
+        <div class="welcome-footer">
+          <button class="footer-action" @click="store.toggleTheme">
+            <i class="bi" :class="store.state.theme === 'dark' ? 'bi-sun' : 'bi-moon'"></i> 
+            {{ store.state.theme === 'dark' ? store.t('light_mode') : store.t('dark_mode') }}
+          </button>
+          <button class="footer-action" @click="store.cycleLang">
+            <i class="bi bi-globe"></i> lang: {{ store.state.lang }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Unregistered State -->
-    <div v-if="!store.state.isRegistered" class="welcome-container">
+    <div v-else-if="!store.state.isRegistered" class="welcome-container">
       <div class="welcome-box">
         <h1 class="welcome-brand">netlazy</h1>
         <p class="welcome-desc">{{ store.t('welcome_desc') }}</p>

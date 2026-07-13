@@ -55,7 +55,7 @@
         <transition-group name="media-list" tag="div" class="media-preview-grid telegram-grid" v-if="validMedia.length > 0">
           <div class="media-thumb" 
                v-for="(m, idx) in validMedia" 
-               :key="m.url" 
+               :key="m.url + '-' + idx" 
                :class="{'drag-over': dragOverIdx === idx}" 
                draggable="true" 
                @dragstart="!m.isUploading && dragStart(idx)" 
@@ -71,14 +71,14 @@
               </div>
             </template>
             <template v-else>
-              <img v-if="m.media_type === 'image'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :style="{filter: m.blur ? 'blur(10px)' : 'none'}">
-              <video v-else-if="m.media_type === 'video'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :style="{filter: m.blur ? 'blur(10px)' : 'none'}"></video>
+              <img v-if="m.media_type === 'image'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+              <video v-else-if="m.media_type === 'video'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               
               <!-- Hourglass loader support when deleting media item -->
-              <div class="media-remove" @click.stop="!m.isDeleting && removeMedia(m)">
+              <div class="media-remove" @click.stop="!m.isDeleting && removeMedia(m, idx)">
                 <i class="bi" :class="m.isDeleting ? 'bi-hourglass-split spin' : 'bi-x'"></i>
               </div>
-              <div class="media-blur-toggle" @click.stop="toggleBlur(m)" :title="m.blur ? store.t('accept') : store.t('decline')">
+              <div class="media-blur-toggle" @click.stop="toggleBlur(m, idx)" :title="m.blur ? store.t('accept') : store.t('decline')">
                 <i class="bi" :class="m.isUpdatingBlur ? 'bi-hourglass-split spin' : (m.blur ? 'bi-eye-slash' : 'bi-eye')"></i>
               </div>
             </template>
@@ -343,10 +343,10 @@ function handlePaste(e) {
   if (files.length > 0) processFiles(files)
 }
 
-async function removeMedia(m) {
+async function removeMedia(m, idx) {
   try {
     m.isDeleting = true
-    const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}`)
+    const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}&index=${idx}`)
     const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
     store.state.myProfile.media = [...res.data.media, ...remainingTemps]
   } catch (e) {
@@ -369,11 +369,11 @@ async function removeAudio() {
   }
 }
 
-async function toggleBlur(m) {
+async function toggleBlur(m, idx) {
   try {
     m.isUpdatingBlur = true
     const newBlurState = !m.blur
-    const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}`)
+    const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}&index=${idx}`)
     const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
     store.state.myProfile.media = [...res.data.media, ...remainingTemps]
     

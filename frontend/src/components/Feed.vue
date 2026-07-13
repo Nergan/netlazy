@@ -23,10 +23,10 @@
           </div>
         </div>
         
-        <div class="chip-group">
+        <div class="chip-group" v-if="profile.tags && profile.tags.length > 0">
           <span class="chip require" style="padding: 0.1rem 0.4rem; font-size: 0.65rem;" v-for="tag in profile.tags" :key="tag">{{ tag }}</span>
         </div>
-        <div style="font-size: 0.85rem;">{{ profile.bio }}</div>
+        <div style="font-size: 0.85rem;" v-if="profile.bio">{{ profile.bio }}</div>
         
         <div style="margin-top: auto; display: flex; width: 100%; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; position: relative;">
           <template v-if="!profile.sent">

@@ -20,10 +20,10 @@
             </div>
           </div>
 
-          <div class="chip-group" v-if="req.profile && req.profile.tags">
+          <div class="chip-group" v-if="req.profile && req.profile.tags && req.profile.tags.length > 0">
             <span class="chip require" style="padding: 0.1rem 0.4rem; font-size: 0.65rem;" v-for="tag in req.profile.tags" :key="tag">{{ tag }}</span>
           </div>
-          <div style="font-size: 0.85rem;" v-if="req.profile">{{ req.profile.bio }}</div>
+          <div style="font-size: 0.85rem;" v-if="req.profile && req.profile.bio">{{ req.profile.bio }}</div>
           
           <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; margin-top: auto;">
             <div style="font-size: 0.75rem; color: var(--accent-info); margin-bottom: 0.2rem;">{{ req.type }}</div>
@@ -81,10 +81,10 @@
             </div>
           </div>
 
-          <div class="chip-group" v-if="req.profile && req.profile.tags">
+          <div class="chip-group" v-if="req.profile && req.profile.tags && req.profile.tags.length > 0">
             <span class="chip require" style="padding: 0.1rem 0.4rem; font-size: 0.65rem;" v-for="tag in req.profile.tags" :key="tag">{{ tag }}</span>
           </div>
-          <div style="font-size: 0.85rem;" v-if="req.profile">{{ req.profile.bio }}</div>
+          <div style="font-size: 0.85rem;" v-if="req.profile && req.profile.bio">{{ req.profile.bio }}</div>
 
           <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; margin-top: auto;">
             <div style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--accent-moss);">
@@ -128,10 +128,10 @@
             </div>
           </div>
 
-          <div class="chip-group" v-if="req.profile && req.profile.tags">
+          <div class="chip-group" v-if="req.profile && req.profile.tags && req.profile.tags.length > 0">
             <span class="chip require" style="padding: 0.1rem 0.4rem; font-size: 0.65rem;" v-for="tag in req.profile.tags" :key="tag">{{ tag }}</span>
           </div>
-          <div style="font-size: 0.85rem;" v-if="req.profile">{{ req.profile.bio }}</div>
+          <div style="font-size: 0.85rem;" v-if="req.profile && req.profile.bio">{{ req.profile.bio }}</div>
 
           <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; margin-top: auto;">
             <div style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">
@@ -206,7 +206,12 @@ async function resolveRequest(req, status) {
     store.addToast(`Handshake ${status}`, "bi-check2")
   } catch (e) {
     req.resolving = false
-    store.addToast("Failed to resolve handshake", "bi-x-circle")
+    if (e.response && e.response.status === 404) {
+      store.addToast("User account no longer exists", "bi-info-circle")
+      store.state.inbox = store.state.inbox.filter(r => r.id !== req.id)
+    } else {
+      store.addToast("Failed to resolve handshake", "bi-x-circle")
+    }
   }
 }
 

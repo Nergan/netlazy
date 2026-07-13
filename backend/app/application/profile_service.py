@@ -111,16 +111,18 @@ class ProfileService:
         await self._profile_repo.upsert(profile)
         return profile
 
-    async def remove_media(self, user_id: str, media_url: str) -> Profile:
+    async def remove_media(self, user_id: str, media_url: str, index: int = None) -> Profile:
         profile = await self.get_or_create_profile(user_id)
         
-        # Pop only ONE matching item by index to prevent unlinking duplicate copies uploaded by the same user
         target = None
-        for i, m in enumerate(profile.media):
-            if m.url == media_url:
-                target = m
-                profile.media.pop(i)
-                break
+        if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
+            target = profile.media.pop(index)
+        else:
+            for i, m in enumerate(profile.media):
+                if m.url == media_url:
+                    target = m
+                    profile.media.pop(i)
+                    break
         
         if not target:
             raise MediaNotFoundError(f"No media item with url {media_url}")
@@ -154,17 +156,23 @@ class ProfileService:
 
         return profile
 
-    async def set_media_blur(self, user_id: str, media_url: str, blur: bool) -> Profile:
+    async def set_media_blur(self, user_id: str, media_url: str, blur: bool, index: int = None) -> Profile:
         profile = await self.get_or_create_profile(user_id)
         found = False
-        for m in profile.media:
-            if m.url == media_url:
-                m.blur = blur
-                found = True
-                break
-        if not found and profile.audio and profile.audio.url == media_url:
-            profile.audio.blur = blur
+        
+        if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
+            profile.media[index].blur = blur
             found = True
+        else:
+            for m in profile.media:
+                if m.url == media_url:
+                    m.blur = blur
+                    found = True
+                    break
+            if not found and profile.audio and profile.audio.url == media_url:
+                profile.audio.blur = blur
+                found = True
+                
         if not found:
             raise MediaNotFoundError(f"No media item with url {media_url}")
 
