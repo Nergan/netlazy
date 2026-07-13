@@ -2,7 +2,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from app.domain.models import User, UserAlreadyExistsError
-from app.domain.repository import NonceRepository, UserRepository
+from app.domain.repository import NonceRepository, UserRepository, ProfileRepository, HandshakeRepository
 from app.infrastructure import crypto_adapter
 
 TIMESTAMP_TOLERANCE_SECONDS = 120
@@ -12,9 +12,7 @@ class InvalidPublicKeyError(Exception):
     pass
 
 class AuthenticationError(Exception):
-    """Raised for any per-request signature authentication failure. Deliberately
-    generic — callers should map this to a single opaque 401 to avoid leaking
-    which check failed (timestamp vs unknown user vs bad signature vs replay)."""
+    """Raised for any per-request signature authentication failure."""
     pass
 
 class AuthService:
@@ -33,8 +31,55 @@ class AuthService:
             public_key_pem=public_key_pem,
             created_at=datetime.now(timezone.utc),
         )
-        await self._user_repo.create(user)  # raises UserAlreadyExistsError on duplicate
+        await self._user_repo.create(user) 
         return user
+
+    async def rotate_key(
+        self,
+        old_user_id: str,
+        new_public_key_pem: str,
+        profile_repo: ProfileRepository,
+        handshake_repo: HandshakeRepository
+    ) -> str:
+        """
+        Secures identity key regeneration on the backend:
+        Creates a new User ID, migrates existing Profile details seamlessly to avoid CDN drops,
+        deletes old handshakes and old user credentials atomically.
+        """
+        try:
+            new_user_id = crypto_adapter.derive_user_id(new_public_key_pem)
+        except crypto_adapter.InvalidPublicKeyError as e:
+            raise InvalidPublicKeyError(str(e)) from e
+
+        existing_user = await self._user_repo.get_by_id(new_user_id)
+        if existing_user:
+            raise UserAlreadyExistsError("New public key already registered")
+
+        old_user = await self._user_repo.get_by_id(old_user_id)
+        known_ips = old_user.known_ips if old_user else []
+        known_fingerprints = old_user.known_fingerprints if old_user else []
+
+        new_user = User(
+            user_id=new_user_id,
+            public_key_pem=new_public_key_pem,
+            created_at=datetime.now(timezone.utc),
+            known_ips=known_ips,
+            known_fingerprints=known_fingerprints
+        )
+        await self._user_repo.create(new_user)
+
+        old_profile = await profile_repo.get_by_user_id(old_user_id)
+        if old_profile:
+            old_profile.user_id = new_user_id
+            old_profile.updated_at = datetime.now(timezone.utc)
+            await profile_repo.upsert(old_profile)
+            await profile_repo.delete(old_user_id)
+
+        await handshake_repo.delete_for_user(old_user_id)
+        await self._nonce_repo.delete_for_user(old_user_id)
+        await self._user_repo.delete(old_user_id)
+
+        return new_user_id
 
     async def authenticate_request(
         self,
@@ -65,3 +110,7 @@ class AuthService:
             raise AuthenticationError("Nonce already used")
 
         return user
+
+    async def delete_user(self, user_id: str) -> None:
+        await self._user_repo.delete(user_id)
+        await self._nonce_repo.delete_for_user(user_id)

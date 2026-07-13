@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.domain.models import User
-from app.presentation.dependencies import inbox_service, profile_service, verify_request_signature
+from app.presentation.dependencies import inbox_service, profile_service, verify_request_signature, verify_pow, handshake_repo
 from app.presentation.profile_router import ProfileResponse, _to_response as profile_to_response
 from app.application.inbox_service import HandshakeNotFoundError, UnauthorizedHandshakeActionError, InvalidHandshakeStateError
 
@@ -28,7 +28,7 @@ class InboxItemResponse(BaseModel):
     updated_at: str
     profile: ProfileResponse
 
-@router.post("/handshakes", response_model=InboxItemResponse)
+@router.post("/handshakes", response_model=InboxItemResponse, dependencies=[Depends(verify_pow)])
 async def send_handshake(body: HandshakeCreateRequest, user: User = Depends(verify_request_signature)):
     h = await inbox_service.send_handshake(
         sender_id=user.user_id,
@@ -68,6 +68,15 @@ async def resolve_handshake(handshake_id: str, body: HandshakeResolveRequest, us
         created_at=h.created_at.isoformat(), updated_at=h.updated_at.isoformat(),
         profile=profile_to_response(sender_profile)
     )
+
+@router.delete("/handshakes/{handshake_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_handshake(handshake_id: str, user: User = Depends(verify_request_signature)):
+    h = await handshake_repo.get_by_id(handshake_id)
+    if not h:
+        raise HTTPException(status_code=404, detail="Handshake not found")
+    if h.sender_id != user.user_id and h.receiver_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    await handshake_repo.delete(handshake_id)
 
 @router.get("", response_model=List[InboxItemResponse])
 async def get_inbox(user: User = Depends(verify_request_signature)):

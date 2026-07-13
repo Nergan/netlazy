@@ -7,6 +7,9 @@ class User:
     user_id: str
     public_key_pem: str
     created_at: datetime
+    known_ips: List[str] = field(default_factory=list)
+    known_fingerprints: List[str] = field(default_factory=list)
+    is_banned: bool = False
 
 class UserAlreadyExistsError(Exception):
     """Raised when attempting to register a public key that is already registered."""
@@ -22,12 +25,13 @@ class Tag:
 @dataclass
 class MediaItem:
     url: str
-    media_type: str  # "image" | "video" | "audio"
+    media_type: str
     blur: bool = False
+    file_hash: str = ""
 
 @dataclass
 class Contact:
-    type: str  # "email" | "link" | "phone" | "unknown"
+    type: str
     value: str
     is_private: bool = True
 
@@ -47,9 +51,21 @@ class Handshake:
     id: str
     sender_id: str
     receiver_id: str
-    handshake_type: str  # "mutual", "demand", "share", "exchange"
-    status: str  # "pending", "accepted", "declined"
+    handshake_type: str
+    status: str
     offered_contact: Optional[str] = None
     returned_contact: Optional[str] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
+
+@dataclass
+class PoWChallenge:
+    id: str
+    difficulty: int
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+@dataclass
+class Ban:
+    type: str  # "ip", "fingerprint", "user_id"
+    value: str
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

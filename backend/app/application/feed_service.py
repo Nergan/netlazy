@@ -18,7 +18,7 @@ class FeedService:
         return await self._profile_repo.get_feed(
             viewer_id=viewer_id,
             exclude_ids=interacted_ids,
-            cursor=cursor,
+            cursor_dt=cursor,
             requires=requires,
             excludes=excludes,
             limit=limit

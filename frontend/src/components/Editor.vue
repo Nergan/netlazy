@@ -1,0 +1,439 @@
+<template>
+  <div class="editor-layout">
+    <div class="tag-library-pane">
+      <div class="tag-library-header blurred-header">
+        <i class="bi bi-search" style="color:var(--text-muted); margin-right: 0.5rem;"></i>
+        <input type="text" class="seamless-input" v-model="store.state.tagSearchQuery" :placeholder="store.t('search_tags')">
+      </div>
+      
+      <div class="tag-library-list chip-group" id="lib-tags-zone" style="padding: 1.5rem; align-content: flex-start;">
+        <span class="chip" 
+              :class="{require: store.state.myProfile.tags.includes(tag.name)}" 
+              :id="'lib-tag-'+tag.name" 
+              v-for="tag in filteredTags" 
+              :key="tag.name" 
+              @click="flyTag($event, tag.name, !store.state.myProfile.tags.includes(tag.name), true)">
+          {{ tag.name }}
+          <i class="bi bi-check2" v-if="store.state.myProfile.tags.includes(tag.name)"></i>
+        </span>
+        <div v-if="filteredTags.length === 0" class="muted-italic" style="color:var(--text-muted); font-size:0.85rem;">
+          {{ store.t('no_tags_found') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-workspace-pane" :class="{collapsed: store.state.isWorkspaceCollapsed, 'is-resizing': isResizingWorkspace}" :style="{width: store.state.isWorkspaceCollapsed ? '0px' : store.state.workspaceWidth + 'px'}" tabindex="0" @paste="handlePaste">
+      <div class="resizer-v left" @mousedown="startResize" v-show="!store.state.isWorkspaceCollapsed"></div>
+      
+      <button class="workspace-toggle-btn" @click="store.state.isWorkspaceCollapsed = !store.state.isWorkspaceCollapsed" :title="store.state.isWorkspaceCollapsed ? store.t('my_profile') : store.t('cancel')">
+        <i class="bi" :class="store.state.isWorkspaceCollapsed ? 'bi-chevron-left' : 'bi-chevron-right'"></i>
+      </button>
+      
+      <div class="workspace-scroll-area" v-show="!store.state.isWorkspaceCollapsed"
+           :class="{'drag-over-files': isDraggingFiles}"
+           @dragenter.prevent="workspaceDragEnter"
+           @dragover.prevent="workspaceDragOver"
+           @dragleave.prevent="workspaceDragLeave"
+           @drop.prevent="workspaceDrop">
+        
+        <div v-if="validMedia.length === 0 && !store.state.myProfile.audio" class="media-zone" @click="$refs.fileInput.click()">
+          <i class="bi bi-image" style="font-size: 1.5rem;"></i><br>{{ store.t('add_media_placeholder') }}
+        </div>
+        
+        <div v-if="store.state.myProfile.audio" class="audio-player-zone" style="display:flex; align-items:center; gap:1rem; padding-bottom: 0.5rem;">
+           <template v-if="store.state.myProfile.audio.isUploading">
+             <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+             <span style="color:var(--text-muted); font-size:0.85rem;">Uploading audio...</span>
+           </template>
+           <template v-else>
+             <audio class="audio-minimal" :src="store.state.myProfile.audio.url" controls style="flex-grow:1;"></audio>
+             <!-- Hourglass loader support when deleting audio track -->
+             <i class="bi contact-action danger" :class="store.state.myProfile.audio.isDeleting ? 'bi-hourglass-split spin' : 'bi-x-circle-fill'" style="font-size:1.2rem; cursor: pointer;" @click="!store.state.myProfile.audio.isDeleting && removeAudio()"></i>
+           </template>
+        </div>
+        
+        <transition-group name="media-list" tag="div" class="media-preview-grid telegram-grid" v-if="validMedia.length > 0">
+          <div class="media-thumb" 
+               v-for="(m, idx) in validMedia" 
+               :key="m.url" 
+               :class="{'drag-over': dragOverIdx === idx}" 
+               draggable="true" 
+               @dragstart="!m.isUploading && dragStart(idx)" 
+               @dragover.prevent="!m.isUploading && dragOver(idx)" 
+               @dragleave="dragLeave" 
+               @drop="!m.isUploading && drop(idx)" 
+               @dragend="dragEnd"
+               @click="!m.isUploading && openLightbox(m)">
+            
+            <template v-if="m.isUploading">
+              <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+                <i class="bi bi-arrow-repeat spin" style="font-size: 2rem; color: var(--text-muted);"></i>
+              </div>
+            </template>
+            <template v-else>
+              <img v-if="m.media_type === 'image'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :style="{filter: m.blur ? 'blur(10px)' : 'none'}">
+              <video v-else-if="m.media_type === 'video'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :style="{filter: m.blur ? 'blur(10px)' : 'none'}"></video>
+              
+              <!-- Hourglass loader support when deleting media item -->
+              <div class="media-remove" @click.stop="!m.isDeleting && removeMedia(m)">
+                <i class="bi" :class="m.isDeleting ? 'bi-hourglass-split spin' : 'bi-x'"></i>
+              </div>
+              <div class="media-blur-toggle" @click.stop="toggleBlur(m)" :title="m.blur ? store.t('accept') : store.t('decline')">
+                <i class="bi" :class="m.isUpdatingBlur ? 'bi-hourglass-split spin' : (m.blur ? 'bi-eye-slash' : 'bi-eye')"></i>
+              </div>
+            </template>
+          </div>
+          
+          <div class="media-thumb mini-add" key="mini-add" @click="$refs.fileInput.click()" title="add media" v-if="validMedia.length < 10">
+            <i class="bi bi-plus-lg"></i>
+          </div>
+        </transition-group>
+        
+        <input type="file" ref="fileInput" hidden multiple accept="image/*,video/*,audio/*" @change="handleFileSelect">
+
+        <div style="margin-top:2rem; margin-bottom: 0.5rem; display:flex; justify-content:space-between; color:var(--text-muted); font-size: 0.75rem;">
+          <span>{{ store.t('about_me') }}</span>
+          <span :style="{color: store.state.myProfile.bio.length > 200 ? 'var(--accent-danger)' : 'inherit'}">{{ store.state.myProfile.bio.length }}/200</span>
+        </div>
+        <textarea class="seamless-input editor-bio" v-model="store.state.myProfile.bio" placeholder="..." rows="3" @input="triggerAutosave"></textarea>
+
+        <div style="color:var(--text-muted); font-size:0.75rem; margin-bottom:0.5rem;">{{ store.t('active_tags') }}</div>
+        <div class="chip-group" id="active-tags-zone" style="margin-bottom: 2rem; min-height: 25px;">
+          <span class="chip require" :id="'act-tag-'+tag" v-for="tag in store.state.myProfile.tags" :key="tag" @click="flyTag($event, tag, false, false)">
+            {{ tag }}
+          </span>
+          <span v-if="store.state.myProfile.tags.length === 0" style="color:var(--text-muted); font-size:0.8rem; font-style:italic;">{{ store.t('none') }}</span>
+        </div>
+
+        <div style="color:var(--text-muted); font-size:0.75rem; margin-bottom:0.5rem;">{{ store.t('contacts') }}</div>
+        <div>
+          <div class="contact-row" v-for="(c, idx) in store.state.myProfile.contacts" :key="c._id">
+            <i class="bi contact-icon" :class="getContactIcon(c.type)"></i>
+            <input type="text" class="seamless-input contact-val" v-model="c.value" :placeholder="store.t('contact_placeholder')" @input="handleContactInput(idx)" @blur="handleContactBlur">
+            <i class="bi bi-copy contact-action" @click="copyText(c.value)" :title="store.t('copy')"></i>
+            <i class="bi contact-action" :class="c.is_private ? 'bi-lock' : 'bi-globe'" @click="c.is_private = !c.is_private; triggerAutosave()" :title="store.t('toggle_privacy')"></i>
+            <i class="bi bi-x-lg contact-action danger" v-if="idx < store.state.myProfile.contacts.length - 1 || store.state.myProfile.contacts.length > 1" @click="removeContact(idx)"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue'
+import { useStore } from '../store/state.js'
+import api from '../utils/api.js'
+
+const store = useStore()
+const fileInput = ref(null)
+const dragOverIdx = ref(null)
+const isDraggingFiles = ref(false)
+const isResizingWorkspace = ref(false)
+
+let dragIndex = null
+let saveTimeout = null
+let isAnimating = false
+
+const filteredTags = computed(() => {
+  const query = store.state.tagSearchQuery.toLowerCase().trim()
+  return store.state.availableSearchTags.filter(t => t.name.includes(query))
+})
+
+// Secure media filter: Filter out ghost entries with empty or missing URLs
+const validMedia = computed(() => {
+  return (store.state.myProfile.media || []).filter(m => m && m.url)
+})
+
+function triggerAutosave() {
+  if (store.state.myProfile.bio.length > 200) {
+    store.state.myProfile.bio = store.state.myProfile.bio.substring(0, 200)
+  }
+  clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(() => {
+    store.saveProfile()
+  }, 1000)
+}
+
+function flyTag(e, tag, isAdding, fromLibrary) {
+  if (isAnimating) return
+  if (fromLibrary && !isAdding) {
+    store.state.myProfile.tags = store.state.myProfile.tags.filter(t => t !== tag)
+    triggerAutosave()
+    return
+  }
+
+  isAnimating = true
+  if (isAdding && store.state.isWorkspaceCollapsed) {
+    store.state.isWorkspaceCollapsed = false
+  }
+
+  const srcEl = e.target.closest('span') || e.target
+  const rect = srcEl.getBoundingClientRect()
+  const clone = srcEl.cloneNode(true)
+  clone.classList.add('flying-tag')
+  clone.style.position = 'fixed'
+  clone.style.left = rect.left + 'px'
+  clone.style.top = rect.top + 'px'
+  clone.style.transition = 'all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)'
+  document.body.appendChild(clone)
+  
+  if (isAdding && !store.state.myProfile.tags.includes(tag)) {
+    store.state.myProfile.tags.push(tag)
+  }
+  
+  setTimeout(() => {
+    const destZone = document.getElementById(isAdding ? 'active-tags-zone' : 'lib-tags-zone')
+    if (destZone) {
+      const destRect = destZone.getBoundingClientRect()
+      clone.style.left = (destRect.left + 20) + 'px'
+      clone.style.top = (destRect.top + 20) + 'px'
+      clone.style.transform = 'scale(0.8)'
+      clone.style.opacity = '0'
+    }
+  }, 10)
+
+  setTimeout(() => {
+    clone.remove()
+    if (!isAdding) {
+      store.state.myProfile.tags = store.state.myProfile.tags.filter(t => t !== tag)
+    }
+    triggerAutosave()
+    isAnimating = false
+  }, 400)
+}
+
+const iconMap = { 'email': 'bi-envelope', 'link': 'bi-link-45deg', 'phone': 'bi-telephone', 'unknown': 'bi-question' }
+function getContactIcon(type) { return iconMap[type] || 'bi-link-45deg' }
+
+function handleContactInput(idx) {
+  const c = store.state.myProfile.contacts[idx]
+  const v = c.value.trim()
+  
+  if (v === '') c.type = 'unknown'
+  else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) c.type = 'email'
+  else if (/^(https?:\/\/|[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+)/.test(v)) c.type = 'link'
+  else if (/^\+?[0-9\s\-]{7,15}$/.test(v)) c.type = 'phone'
+  else c.type = 'unknown'
+
+  const contacts = store.state.myProfile.contacts
+  if (idx === contacts.length - 1 && c.type !== 'unknown' && v !== '') {
+    contacts.push({ type: 'unknown', value: '', is_private: true, _id: Math.random().toString() })
+  }
+
+  if (c.type !== 'unknown' || v === '') {
+    triggerAutosave()
+  }
+}
+
+function handleContactBlur() {
+  const contacts = store.state.myProfile.contacts
+  for (let i = contacts.length - 2; i >= 0; i--) {
+    if (contacts[i].value.trim() === '') contacts.splice(i, 1)
+  }
+  if (contacts.length === 0) {
+    contacts.push({ type: 'unknown', value: '', is_private: true, _id: Math.random().toString() })
+  }
+  triggerAutosave()
+}
+
+function removeContact(idx) {
+  store.state.myProfile.contacts.splice(idx, 1)
+  if (store.state.myProfile.contacts.length === 0) {
+    store.state.myProfile.contacts.push({ type: 'unknown', value: '', is_private: true, _id: Math.random().toString() })
+  }
+  triggerAutosave()
+}
+
+async function copyText(txt) {
+  await navigator.clipboard.writeText(txt)
+  store.addToast(store.t('copied'), "bi-check2")
+}
+
+// Media Operations
+async function processFiles(files) {
+  const tempItems = []
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (file.size > 25 * 1024 * 1024) {
+      store.addToast("File too large (max 25MB)", "bi-x-octagon")
+      continue
+    }
+    
+    const tempId = Math.random().toString()
+    const media_type = file.type.startsWith('video') ? 'video' : (file.type.startsWith('audio') ? 'audio' : 'image')
+    
+    if (media_type === 'audio') {
+      store.state.myProfile.audio = { url: tempId, media_type: 'audio', blur: false, isUploading: true, isDeleting: false, file }
+    } else {
+      tempItems.push({ url: tempId, media_type, blur: false, isUploading: true, isDeleting: false, file })
+    }
+  }
+  
+  if (tempItems.length > 0) {
+    store.state.myProfile.media.push(...tempItems)
+  }
+  
+  // Upload audio
+  if (store.state.myProfile.audio && store.state.myProfile.audio.isUploading) {
+    const tempAudio = store.state.myProfile.audio
+    try {
+      const res = await api.post('/profile/me/media', tempAudio.file, {
+        headers: { 'Content-Type': tempAudio.file.type || 'application/octet-stream' }
+      })
+      const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading)
+      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+      store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+    } catch (e) {
+      store.addToast("Failed to upload audio", "bi-exclamation-triangle")
+      store.state.myProfile.audio = null
+    }
+  }
+
+  // Upload video/images sequentially to prevent API race conditions & accurately render UI placeholders
+  for (const temp of tempItems) {
+    try {
+      const res = await api.post('/profile/me/media', temp.file, {
+        headers: { 'Content-Type': temp.file.type || 'application/octet-stream' }
+      })
+      const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading && m.url !== temp.url)
+      
+      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+      
+      // Fix audio loading bug: Only assign if audio response is actually truthy
+      if (!store.state.myProfile.audio?.isUploading) {
+        store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+      }
+    } catch (e) {
+      store.addToast("Failed to upload media", "bi-exclamation-triangle")
+      store.state.myProfile.media = store.state.myProfile.media.filter(m => m.url !== temp.url)
+    }
+  }
+}
+
+// Full Workspace Drag-and-Drop Area Handling
+function workspaceDragEnter(e) {
+  if (dragIndex === null) isDraggingFiles.value = true
+}
+function workspaceDragOver(e) {
+  if (dragIndex === null) isDraggingFiles.value = true
+}
+function workspaceDragLeave(e) {
+  const rect = e.currentTarget.getBoundingClientRect()
+  if (e.clientX <= rect.left || e.clientX >= rect.right || e.clientY <= rect.top || e.clientY >= rect.bottom) {
+    isDraggingFiles.value = false
+  }
+}
+function workspaceDrop(e) {
+  isDraggingFiles.value = false
+  if (dragIndex === null && e.dataTransfer && e.dataTransfer.files.length > 0) {
+    processFiles(e.dataTransfer.files)
+  }
+}
+
+function handleFileSelect(e) { processFiles(e.target.files); e.target.value = null }
+function handlePaste(e) {
+  if (store.state.currentView !== 'editor') return
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items
+  const files = []
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].kind === 'file') files.push(items[i].getAsFile())
+  }
+  if (files.length > 0) processFiles(files)
+}
+
+async function removeMedia(m) {
+  try {
+    m.isDeleting = true
+    const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}`)
+    const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
+    store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+  } catch (e) {
+    m.isDeleting = false
+    store.addToast("Failed to delete media", "bi-x-circle")
+  }
+}
+
+async function removeAudio() {
+  if (!store.state.myProfile.audio) return
+  try {
+    store.state.myProfile.audio.isDeleting = true
+    const res = await api.delete('/profile/me/audio')
+    store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+  } catch(e) {
+    if (store.state.myProfile.audio) {
+      store.state.myProfile.audio.isDeleting = false
+    }
+    store.addToast("Failed to delete audio", "bi-x-circle")
+  }
+}
+
+async function toggleBlur(m) {
+  try {
+    m.isUpdatingBlur = true
+    const newBlurState = !m.blur
+    const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}`)
+    const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
+    store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+    
+    if (!store.state.myProfile.audio?.isUploading) {
+      store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+    }
+  } catch(e) {
+    m.isUpdatingBlur = false
+    store.addToast("Failed to update blur state", "bi-x-circle")
+  }
+}
+
+// Drag & Drop Reordering
+function dragStart(idx) { dragIndex = idx }
+function dragOver(idx) { dragOverIdx.value = idx }
+function dragLeave() { dragOverIdx.value = null }
+function dragEnd() { dragIndex = null; dragOverIdx.value = null; }
+
+async function drop(idx) {
+  dragOverIdx.value = null
+  if (dragIndex !== null && dragIndex !== idx) {
+    const t = store.state.myProfile.media[dragIndex]
+    store.state.myProfile.media.splice(dragIndex, 1)
+    store.state.myProfile.media.splice(idx, 0, t)
+    dragIndex = null
+    
+    try {
+      const urls = store.state.myProfile.media.filter(m => !m.isUploading).map(m => m.url)
+      const res = await api.put('/profile/me/media/order', { urls })
+      const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
+      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+    } catch(e) {
+      store.addToast("Failed to save media order", "bi-x-circle")
+    }
+  }
+  dragIndex = null
+}
+
+function openLightbox(m) {
+  store.state.lightbox.media = m
+  store.state.lightbox.open = true
+}
+
+let startX, startW
+function startResize(e) {
+  isResizingWorkspace.value = true
+  startX = e.clientX
+  startW = store.state.workspaceWidth
+  document.addEventListener('mousemove', doResize)
+  document.addEventListener('mouseup', stopResize)
+  document.body.style.userSelect = 'none'
+}
+function doResize(e) {
+  const w = startW - (e.clientX - startX)
+  if (w > 350 && w < 800) store.state.workspaceWidth = w
+}
+function stopResize() {
+  isResizingWorkspace.value = false
+  document.removeEventListener('mousemove', doResize)
+  document.removeEventListener('mouseup', stopResize)
+  document.body.style.userSelect = ''
+}
+</script>

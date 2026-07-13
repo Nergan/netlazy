@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.application.profile_service import (
@@ -44,6 +44,7 @@ class ProfileResponse(BaseModel):
     media: List[MediaItemResponse]
     audio: Optional[MediaItemResponse]
     contacts: List[ContactResponse]
+    created_at: str
 
 def _to_response(profile: Profile) -> ProfileResponse:
     return ProfileResponse(
@@ -56,6 +57,7 @@ def _to_response(profile: Profile) -> ProfileResponse:
             if profile.audio else None
         ),
         contacts=[ContactResponse(type=c.type, value=c.value, is_private=c.is_private) for c in profile.contacts],
+        created_at=profile.created_at.isoformat(),
     )
 
 @router.get("/me", response_model=ProfileResponse)
@@ -89,10 +91,13 @@ async def reorder_media(body: MediaOrderRequest, user: User = Depends(verify_req
 
 @router.post("/me/media", response_model=ProfileResponse)
 async def upload_media(
-    file: UploadFile = File(...),
+    request: Request,
     user: User = Depends(verify_request_signature),
 ):
-    raw_bytes = await file.read()
+    raw_bytes = await request.body()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Empty body")
+
     try:
         profile = await profile_service.upload_media(user.user_id, raw_bytes)
     except UnsupportedMediaTypeError as e:

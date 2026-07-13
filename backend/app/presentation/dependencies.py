@@ -2,11 +2,13 @@ import base64
 import hashlib
 import logging
 from fastapi import Request, Header, HTTPException
+from starlette.requests import ClientDisconnect
 from app.application.auth_service import AuthService, AuthenticationError
 from app.application.profile_service import ProfileService
 from app.application.tag_service import TagService
 from app.application.feed_service import FeedService
 from app.application.inbox_service import InboxService
+from app.application.security_service import SecurityService, BannedError, ProofOfWorkError
 from app.config import settings
 from app.domain.models import User
 from app.infrastructure.cloudinary_adapter import CloudinaryMediaStorage
@@ -14,11 +16,14 @@ from app.infrastructure.mongo_repo import (
     MongoHandshakeRepository,
     MongoNonceRepository,
     MongoProfileRepository,
+    MongoSecurityRepository,
     MongoTagRepository,
     MongoUserRepository,
 )
 
 AUTH_ERROR = HTTPException(status_code=401, detail="Invalid authentication credentials")
+BANNED_ERROR = HTTPException(status_code=403, detail="banned")
+POW_ERROR = HTTPException(status_code=400, detail="Invalid or missing Proof of Work")
 
 # Composition root: initialize repos
 user_repo = MongoUserRepository()
@@ -26,6 +31,7 @@ nonce_repo = MongoNonceRepository()
 tag_repo = MongoTagRepository()
 profile_repo = MongoProfileRepository()
 handshake_repo = MongoHandshakeRepository()
+security_repo = MongoSecurityRepository()
 media_storage = CloudinaryMediaStorage()
 
 # Composition root: initialize services
@@ -54,6 +60,18 @@ inbox_service = InboxService(
     profile_repo=profile_repo
 )
 
+security_service = SecurityService(
+    security_repo=security_repo,
+    user_repo=user_repo,
+    difficulty=settings.pow_difficulty
+)
+
+
+def _get_client_footprint(request: Request) -> tuple:
+    ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "127.0.0.1").split(",")[0].strip()
+    fingerprint = request.headers.get("X-Fingerprint", "unknown")
+    return ip, fingerprint
+
 
 async def verify_request_signature(
     request: Request,
@@ -63,7 +81,18 @@ async def verify_request_signature(
     x_signature: str = Header(...),
 ) -> User:
     
-    body_bytes = await request.body()
+    ip, fingerprint = _get_client_footprint(request)
+    
+    try:
+        await security_service.verify_not_banned(ip, fingerprint, x_user_id)
+    except BannedError:
+        raise BANNED_ERROR
+
+    try:
+        body_bytes = await request.body()
+    except ClientDisconnect:
+        raise HTTPException(status_code=400, detail="Client disconnected")
+
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     query_string = request.url.query
 
@@ -91,4 +120,26 @@ async def verify_request_signature(
         logging.error(f"Unexpected error during signature verification: {e}")
         raise AUTH_ERROR
 
+    # Secure verification: If user has been banned explicitly, reject immediately
+    if user.is_banned:
+        raise BANNED_ERROR
+
+    # Log successful footprint entry post-authentication
+    await user_repo.log_footprint(x_user_id, ip, fingerprint)
+
     return user
+
+
+async def verify_pow(
+    request: Request,
+    x_challenge_id: str = Header(...),
+    x_pow_nonce: str = Header(...),
+) -> None:
+    ip, fingerprint = _get_client_footprint(request)
+    try:
+        await security_service.verify_not_banned(ip, fingerprint)
+        await security_service.verify_pow(x_challenge_id, x_pow_nonce)
+    except BannedError:
+        raise BANNED_ERROR
+    except ProofOfWorkError:
+        raise POW_ERROR

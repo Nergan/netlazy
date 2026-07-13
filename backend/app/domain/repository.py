@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
-from app.domain.models import Handshake, Profile, Tag, User
+from app.domain.models import Handshake, PoWChallenge, Profile, Tag, User, MediaItem
 
 class UserRepository(ABC):
     @abstractmethod
@@ -11,10 +11,22 @@ class UserRepository(ABC):
     @abstractmethod
     async def get_by_id(self, user_id: str) -> Optional[User]:
         ...
+        
+    @abstractmethod
+    async def log_footprint(self, user_id: str, ip: str, fingerprint: str) -> None:
+        ...
+
+    @abstractmethod
+    async def delete(self, user_id: str) -> None:
+        ...
 
 class NonceRepository(ABC):
     @abstractmethod
     async def insert_if_not_exists(self, user_id: str, nonce: str) -> bool:
+        ...
+
+    @abstractmethod
+    async def delete_for_user(self, user_id: str) -> None:
         ...
 
 class TagRepository(ABC):
@@ -49,7 +61,18 @@ class ProfileRepository(ABC):
         
     @abstractmethod
     async def get_feed(self, viewer_id: str, exclude_ids: List[str], cursor: datetime, requires: List[str], excludes: List[str], limit: int) -> List[Profile]:
-        """Fetches a paginated batch of profiles matching requirements."""
+        ...
+
+    @abstractmethod
+    async def delete(self, user_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def count_media_usage(self, file_hash: str) -> int:
+        ...
+
+    @abstractmethod
+    async def find_media_by_hash(self, file_hash: str) -> Optional[MediaItem]:
         ...
 
 class HandshakeRepository(ABC):
@@ -59,6 +82,10 @@ class HandshakeRepository(ABC):
 
     @abstractmethod
     async def update(self, handshake: Handshake) -> None:
+        ...
+
+    @abstractmethod
+    async def delete(self, handshake_id: str) -> None:
         ...
 
     @abstractmethod
@@ -73,7 +100,32 @@ class HandshakeRepository(ABC):
     async def get_interacted_user_ids(self, user_id: str) -> List[str]:
         ...
 
+    @abstractmethod
+    async def delete_for_user(self, user_id: str) -> None:
+        ...
+
 class MediaStorage(ABC):
     @abstractmethod
     async def upload(self, file_bytes: bytes, media_type: str, public_id_hint: str) -> str:
+        ...
+        
+    @abstractmethod
+    async def delete(self, url: str) -> None:
+        ...
+
+class SecurityRepository(ABC):
+    @abstractmethod
+    async def create_challenge(self, challenge: PoWChallenge) -> None:
+        ...
+
+    @abstractmethod
+    async def consume_challenge(self, challenge_id: str) -> Optional[PoWChallenge]:
+        ...
+
+    @abstractmethod
+    async def is_banned(self, ip: str, fingerprint: str, user_id: Optional[str] = None) -> bool:
+        ...
+
+    @abstractmethod
+    async def apply_bans(self, ips: List[str], fingerprints: List[str], user_id: str) -> None:
         ...
