@@ -48,7 +48,7 @@
            
            <audio v-show="!store.state.myProfile.audio.isUploading" class="audio-minimal" :src="store.state.myProfile.audio.url" @loadeddata="store.state.myProfile.audio.isLoaded = true" controls style="flex-grow:1;"></audio>
            
-           <i class="bi contact-action danger" v-show="store.state.myProfile.audio.isUploading || store.state.myProfile.audio.isLoaded" :class="store.state.myProfile.audio.isDeleting ? 'bi-hourglass-split spin' : 'bi-x-circle-fill'" style="font-size:1.2rem; cursor: pointer;" @click="!store.state.myProfile.audio.isDeleting && removeAudio()"></i>
+           <i class="bi contact-action danger" :class="store.state.myProfile.audio.isDeleting ? 'bi-hourglass-split spin' : 'bi-x-circle-fill'" style="font-size:1.2rem; cursor: pointer;" @click="!store.state.myProfile.audio.isDeleting && removeAudio()"></i>
         </div>
         
         <transition-group name="media-list" tag="div" class="media-preview-grid telegram-grid" v-if="validMedia.length > 0">
@@ -71,10 +71,10 @@
             <img v-if="m.media_type === 'image'" v-show="!m.isUploading && m.isLoaded" @load="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" :class="{'is-blurred': m.blur}">
             <video v-else-if="m.media_type === 'video'" v-show="!m.isUploading && m.isLoaded" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" :src="m.url" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
             
-            <div class="media-remove" v-show="m.isUploading || m.isLoaded" @click.stop="!m.isDeleting && removeMedia(m, idx)">
+            <div class="media-remove" @click.stop="!m.isDeleting && removeMedia(m, idx)">
               <i class="bi" :class="m.isDeleting ? 'bi-hourglass-split spin' : 'bi-x'"></i>
             </div>
-            <div class="media-blur-toggle" v-show="m.isUploading || m.isLoaded" @click.stop="toggleBlur(m, idx)" :title="m.blur ? store.t('accept') : store.t('decline')">
+            <div class="media-blur-toggle" @click.stop="toggleBlur(m, idx)" :title="m.blur ? store.t('accept') : store.t('decline')">
               <i class="bi" :class="m.isUpdatingBlur ? 'bi-hourglass-split spin' : (m.blur ? 'bi-eye-slash' : 'bi-eye')"></i>
             </div>
             
@@ -181,7 +181,7 @@ function flyTag(e, tag, isAdding, fromLibrary) {
   }
   
   setTimeout(() => {
-    const destZone = document.getElementById(isAdding ? 'active-tags-zone' : 'lib-tags-zone')
+    const destZone = document.getElementById('active-tags-zone')
     if (destZone) {
       const destRect = destZone.getBoundingClientRect()
       clone.style.left = (destRect.left + 20) + 'px'
@@ -251,7 +251,7 @@ async function copyText(txt) {
 function updateMediaList(resMedia, remainingTemps) {
     const updated = resMedia.map(newM => {
         const old = store.state.myProfile.media.find(m => m.url === newM.url);
-        return old ? { ...newM, isDeleting: old.isDeleting, isUpdatingBlur: false, isLoaded: old.isLoaded, isUploading: false } 
+        return old ? { ...newM, isDeleting: old.isDeleting, isUpdatingBlur: old.isUpdatingBlur || false, isLoaded: old.isLoaded, isUploading: false } 
                    : { ...newM, isLoaded: false, isUploading: false };
     });
     store.state.myProfile.media = [...updated, ...remainingTemps];
@@ -288,12 +288,25 @@ async function processFiles(files) {
     audioPromise = api.post(`/profile/me/media?blur=${tempAudio.blur}`, tempAudio.file, {
       headers: { 'Content-Type': tempAudio.file.type || 'application/octet-stream' },
       signal: tempAudio.abortCtrl.signal
-    }).then(res => {
+    }).then(async res => {
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading)
       updateMediaList(res.data.media, remainingTemps)
       if (res.data.audio) {
           const oldAudio = store.state.myProfile.audio;
-          store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: false };
+          const reactiveAudio = store.state.myProfile.audio;
+          const desiredBlur = reactiveAudio ? reactiveAudio.blur : tempAudio.blur;
+
+          if (desiredBlur !== res.data.audio.blur) {
+              try {
+                  const resBlur = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(res.data.audio.url)}&blur=${desiredBlur}`);
+                  store.state.myProfile.audio = { ...resBlur.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: false };
+              } catch (e) {
+                  console.error("Failed to sync audio blur state after upload:", e);
+                  store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: false };
+              }
+          } else {
+              store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: false };
+          }
       } else {
           store.state.myProfile.audio = null;
       }
@@ -308,9 +321,30 @@ async function processFiles(files) {
     return api.post(`/profile/me/media?blur=${temp.blur}`, temp.file, {
       headers: { 'Content-Type': temp.file.type || 'application/octet-stream' },
       signal: temp.abortCtrl.signal
-    }).then(res => {
+    }).then(async res => {
+      const existingUrls = new Set(store.state.myProfile.media.filter(m => !m.isUploading).map(m => m.url));
+      const newItem = res.data.media.find(m => !existingUrls.has(m.url));
+      
+      const reactiveTemp = store.state.myProfile.media.find(m => m.url === temp.url);
+      const desiredBlur = reactiveTemp ? reactiveTemp.blur : temp.blur;
+
+      if (newItem) {
+          newItem.blur = desiredBlur;
+      }
+
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading && m.url !== temp.url)
       updateMediaList(res.data.media, remainingTemps)
+
+      if (newItem && desiredBlur !== false) {
+          try {
+              const newIdx = res.data.media.findIndex(m => m.url === newItem.url);
+              const resBlur = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(newItem.url)}&blur=${desiredBlur}&index=${newIdx}`);
+              updateMediaList(resBlur.data.media, remainingTemps);
+          } catch (e) {
+              console.error("Failed to sync blur state after upload:", e);
+          }
+      }
+
       if (!store.state.myProfile.audio?.isUploading) {
         if (res.data.audio) {
             const oldAudio = store.state.myProfile.audio;
@@ -360,19 +394,23 @@ function handlePaste(e) {
 }
 
 async function removeMedia(m, idx) {
-  if (m.isUploading) {
-    if (m.abortCtrl) m.abortCtrl.abort();
-    store.state.myProfile.media.splice(idx, 1);
-    return;
-  }
-  try {
-    m.isDeleting = true
-    const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}&index=${idx}`)
-    const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
-    updateMediaList(res.data.media, remainingTemps)
-  } catch (e) {
-    m.isDeleting = false
-    store.addToast("Failed to delete media", "bi-x-circle")
+  const realIdx = store.state.myProfile.media.findIndex(x => x.url === m.url);
+  if (realIdx !== -1) {
+    if (m.isUploading) {
+      if (m.abortCtrl) m.abortCtrl.abort();
+      store.state.myProfile.media.splice(realIdx, 1);
+      return;
+    }
+    try {
+      m.isDeleting = true
+      const completedIdx = store.state.myProfile.media.filter(x => !x.isUploading).findIndex(x => x.url === m.url);
+      const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}&index=${completedIdx !== -1 ? completedIdx : ''}`)
+      const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
+      updateMediaList(res.data.media, remainingTemps)
+    } catch (e) {
+      m.isDeleting = false
+      store.addToast("Failed to delete media", "bi-x-circle")
+    }
   }
 }
 
@@ -397,6 +435,9 @@ async function removeAudio() {
 }
 
 async function toggleBlur(m, idx) {
+  const realIdx = store.state.myProfile.media.findIndex(x => x.url === m.url);
+  if (realIdx === -1) return;
+
   if (m.isUploading) {
     m.blur = !m.blur;
     return;
@@ -404,7 +445,8 @@ async function toggleBlur(m, idx) {
   try {
     m.isUpdatingBlur = true
     const newBlurState = !m.blur
-    const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}&index=${idx}`)
+    const completedIdx = store.state.myProfile.media.filter(x => !x.isUploading).findIndex(x => x.url === m.url);
+    const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}&index=${completedIdx !== -1 ? completedIdx : ''}`)
     const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
     updateMediaList(res.data.media, remainingTemps)
     
