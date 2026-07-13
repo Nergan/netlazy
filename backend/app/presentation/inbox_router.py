@@ -78,9 +78,18 @@ async def delete_handshake(handshake_id: str, user: User = Depends(verify_reques
     h = await handshake_repo.get_by_id(handshake_id)
     if not h:
         raise HTTPException(status_code=404, detail="Handshake not found")
-    if h.sender_id != user.user_id and h.receiver_id != user.user_id:
+    
+    if h.sender_id == user.user_id:
+        h.sender_deleted = True
+    elif h.receiver_id == user.user_id:
+        h.receiver_deleted = True
+    else:
         raise HTTPException(status_code=403, detail="Forbidden")
-    await handshake_repo.delete(handshake_id)
+        
+    if h.sender_deleted and h.receiver_deleted:
+        await handshake_repo.delete(handshake_id)
+    else:
+        await handshake_repo.update(h)
 
 @router.get("", response_model=List[InboxItemResponse])
 async def get_inbox(user: User = Depends(verify_request_signature)):

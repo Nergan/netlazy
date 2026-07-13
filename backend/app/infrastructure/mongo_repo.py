@@ -89,6 +89,14 @@ class MongoSecurityRepository(SecurityRepository):
             )
         await db_instance.users_collection.update_one({"user_id": user_id}, {"$set": {"is_banned": True}})
 
+    async def remove_bans(self, ips: List[str], fingerprints: List[str], user_id: str) -> None:
+        ops = []
+        for ip in ips: ops.append({"type": "ip", "value": ip})
+        for fp in fingerprints: ops.append({"type": "fingerprint", "value": fp})
+        ops.append({"type": "user_id", "value": user_id})
+        if ops:
+            await db_instance.bans_collection.delete_many({"$or": ops})
+
 class MongoTagRepository(TagRepository):
     async def sync(self, tags: List[Tag]) -> None:
         valid_names = [t.name for t in tags]
@@ -151,7 +159,6 @@ class MongoProfileRepository(ProfileRepository):
         )
 
     async def get_feed(self, viewer_id: str, exclude_ids: List[str], cursor_dt: datetime, requires: List[str], excludes: List[str], limit: int) -> List[Profile]:
-        # Secure enforcement: Fetch all banned user IDs to exclude their profiles from search results
         banned_users_cursor = db_instance.users_collection.find({"is_banned": True}, {"user_id": 1})
         banned_ids = [u["user_id"] async for u in banned_users_cursor]
 
@@ -230,17 +237,31 @@ class MongoHandshakeRepository(HandshakeRepository):
         doc = await db_instance.handshakes_collection.find_one({"id": handshake_id})
         return self._to_domain(doc) if doc else None
 
+    async def get_between_users(self, user_id_1: str, user_id_2: str) -> Optional[Handshake]:
+        doc = await db_instance.handshakes_collection.find_one({
+            "$or": [
+                {"sender_id": user_id_1, "receiver_id": user_id_2},
+                {"sender_id": user_id_2, "receiver_id": user_id_1}
+            ]
+        })
+        return self._to_domain(doc) if doc else None
+
     async def get_for_user(self, user_id: str) -> List[Handshake]:
-        cursor = db_instance.handshakes_collection.find(
-            {"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]}
-        ).sort("updated_at", -1)
+        cursor = db_instance.handshakes_collection.find({
+            "$or": [
+                {"sender_id": user_id, "sender_deleted": {"$ne": True}},
+                {"receiver_id": user_id, "receiver_deleted": {"$ne": True}}
+            ]
+        }).sort("updated_at", -1)
         return [self._to_domain(doc) async for doc in cursor]
 
     async def get_interacted_user_ids(self, user_id: str) -> List[str]:
-        cursor = db_instance.handshakes_collection.find(
-            {"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]},
-            {"sender_id": 1, "receiver_id": 1}
-        )
+        cursor = db_instance.handshakes_collection.find({
+            "$or": [
+                {"sender_id": user_id, "sender_deleted": {"$ne": True}},
+                {"receiver_id": user_id, "receiver_deleted": {"$ne": True}}
+            ]
+        })
         interacted = set()
         async for doc in cursor:
             if doc["sender_id"] != user_id: interacted.add(doc["sender_id"])
@@ -255,6 +276,7 @@ class MongoHandshakeRepository(HandshakeRepository):
             "id": h.id, "sender_id": h.sender_id, "receiver_id": h.receiver_id,
             "handshake_type": h.handshake_type, "status": h.status,
             "offered_contact": h.offered_contact, "returned_contact": h.returned_contact,
+            "sender_deleted": h.sender_deleted, "receiver_deleted": h.receiver_deleted,
             "created_at": h.created_at, "updated_at": h.updated_at
         }
 
@@ -263,5 +285,6 @@ class MongoHandshakeRepository(HandshakeRepository):
             id=doc["id"], sender_id=doc["sender_id"], receiver_id=doc["receiver_id"],
             handshake_type=doc["handshake_type"], status=doc["status"],
             offered_contact=doc.get("offered_contact"), returned_contact=doc.get("returned_contact"),
+            sender_deleted=doc.get("sender_deleted", False), receiver_deleted=doc.get("receiver_deleted", False),
             created_at=doc["created_at"], updated_at=doc.get("updated_at")
         )

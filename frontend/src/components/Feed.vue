@@ -18,8 +18,13 @@
 
         <div class="telegram-grid" v-if="profile.media && profile.media.length > 0">
           <div class="media-thumb" v-for="m in profile.media" :key="m.url" @click="handleMediaClick(profile, m)">
-             <img v-if="m.media_type === 'image'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-             <video v-else-if="m.media_type === 'video'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+             <template v-if="!m.isLoaded">
+               <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+                 <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+               </div>
+             </template>
+             <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+             <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
           </div>
         </div>
         
@@ -95,7 +100,7 @@ const validPrivateContacts = computed(() =>
 
 const visibleSearchTags = computed(() => {
   const query = filterText.value.toLowerCase().trim()
-  return store.state.availableSearchTags.filter(t => t.name.includes(query))
+  return store.state.availableSearchTags.filter(t => t.name.includes(query) || t.aliases.some(a => a.includes(query)))
 })
 
 async function fetchFeed(reset = false) {
@@ -122,6 +127,9 @@ async function fetchFeed(reset = false) {
     if (batch.length < 20) hasMore.value = false
     if (batch.length > 0) {
       currentCursor = batch[batch.length - 1].created_at
+      batch.forEach(p => {
+          if (p.media) p.media.forEach(m => m.isLoaded = false)
+      })
       store.state.feed.push(...batch)
     }
   } catch (e) {
@@ -131,7 +139,6 @@ async function fetchFeed(reset = false) {
   }
 }
 
-// Re-fetch whenever tags change
 watch(() => store.state.availableSearchTags, () => {
   fetchFeed(true)
 }, { deep: true })

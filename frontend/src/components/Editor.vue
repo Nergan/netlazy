@@ -41,21 +41,20 @@
         </div>
         
         <div v-if="store.state.myProfile.audio" class="audio-player-zone" style="display:flex; align-items:center; gap:1rem; padding-bottom: 0.5rem;">
-           <template v-if="store.state.myProfile.audio.isUploading">
+           <template v-if="store.state.myProfile.audio.isUploading || !store.state.myProfile.audio.isLoaded">
              <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
              <span style="color:var(--text-muted); font-size:0.85rem;">Uploading audio...</span>
            </template>
-           <template v-else>
-             <audio class="audio-minimal" :src="store.state.myProfile.audio.url" controls style="flex-grow:1;"></audio>
-             <!-- Hourglass loader support when deleting audio track -->
-             <i class="bi contact-action danger" :class="store.state.myProfile.audio.isDeleting ? 'bi-hourglass-split spin' : 'bi-x-circle-fill'" style="font-size:1.2rem; cursor: pointer;" @click="!store.state.myProfile.audio.isDeleting && removeAudio()"></i>
+           <template v-if="!store.state.myProfile.audio.isUploading">
+             <audio class="audio-minimal" :src="store.state.myProfile.audio.url" v-show="store.state.myProfile.audio.isLoaded" @loadeddata="store.state.myProfile.audio.isLoaded = true" controls style="flex-grow:1;"></audio>
+             <i class="bi contact-action danger" v-show="store.state.myProfile.audio.isLoaded" :class="store.state.myProfile.audio.isDeleting ? 'bi-hourglass-split spin' : 'bi-x-circle-fill'" style="font-size:1.2rem; cursor: pointer;" @click="!store.state.myProfile.audio.isDeleting && removeAudio()"></i>
            </template>
         </div>
         
         <transition-group name="media-list" tag="div" class="media-preview-grid telegram-grid" v-if="validMedia.length > 0">
           <div class="media-thumb" 
                v-for="(m, idx) in validMedia" 
-               :key="m.url + '-' + idx" 
+               :key="m.url" 
                :class="{'drag-over': dragOverIdx === idx}" 
                draggable="true" 
                @dragstart="!m.isUploading && dragStart(idx)" 
@@ -65,20 +64,19 @@
                @dragend="dragEnd"
                @click="!m.isUploading && openLightbox(m)">
             
-            <template v-if="m.isUploading">
+            <template v-if="m.isUploading || !m.isLoaded">
               <div style="display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
                 <i class="bi bi-arrow-repeat spin" style="font-size: 2rem; color: var(--text-muted);"></i>
               </div>
             </template>
-            <template v-else>
-              <img v-if="m.media_type === 'image'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-              <video v-else-if="m.media_type === 'video'" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+            <template v-if="!m.isUploading">
+              <img v-if="m.media_type === 'image'" v-show="m.isLoaded" @load="m.isLoaded = true" :src="m.url" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+              <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" @loadeddata="m.isLoaded = true" :src="m.url" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               
-              <!-- Hourglass loader support when deleting media item -->
-              <div class="media-remove" @click.stop="!m.isDeleting && removeMedia(m, idx)">
+              <div class="media-remove" v-show="m.isLoaded" @click.stop="!m.isDeleting && removeMedia(m, idx)">
                 <i class="bi" :class="m.isDeleting ? 'bi-hourglass-split spin' : 'bi-x'"></i>
               </div>
-              <div class="media-blur-toggle" @click.stop="toggleBlur(m, idx)" :title="m.blur ? store.t('accept') : store.t('decline')">
+              <div class="media-blur-toggle" v-show="m.isLoaded" @click.stop="toggleBlur(m, idx)" :title="m.blur ? store.t('accept') : store.t('decline')">
                 <i class="bi" :class="m.isUpdatingBlur ? 'bi-hourglass-split spin' : (m.blur ? 'bi-eye-slash' : 'bi-eye')"></i>
               </div>
             </template>
@@ -137,10 +135,9 @@ let isAnimating = false
 
 const filteredTags = computed(() => {
   const query = store.state.tagSearchQuery.toLowerCase().trim()
-  return store.state.availableSearchTags.filter(t => t.name.includes(query))
+  return store.state.availableSearchTags.filter(t => t.name.includes(query) || t.aliases.some(a => a.includes(query)))
 })
 
-// Secure media filter: Filter out ghost entries with empty or missing URLs
 const validMedia = computed(() => {
   return (store.state.myProfile.media || []).filter(m => m && m.url)
 })
@@ -250,7 +247,15 @@ async function copyText(txt) {
   store.addToast(store.t('copied'), "bi-check2")
 }
 
-// Media Operations
+function updateMediaList(resMedia, remainingTemps) {
+    const updated = resMedia.map(newM => {
+        const old = store.state.myProfile.media.find(m => m.url === newM.url);
+        return old ? { ...newM, isDeleting: old.isDeleting, isUpdatingBlur: old.isUpdatingBlur, isLoaded: old.isLoaded, isUploading: false } 
+                   : { ...newM, isLoaded: false, isUploading: false };
+    });
+    store.state.myProfile.media = [...updated, ...remainingTemps];
+}
+
 async function processFiles(files) {
   const tempItems = []
   
@@ -265,9 +270,9 @@ async function processFiles(files) {
     const media_type = file.type.startsWith('video') ? 'video' : (file.type.startsWith('audio') ? 'audio' : 'image')
     
     if (media_type === 'audio') {
-      store.state.myProfile.audio = { url: tempId, media_type: 'audio', blur: false, isUploading: true, isDeleting: false, file }
+      store.state.myProfile.audio = { url: tempId, media_type: 'audio', blur: false, isUploading: true, isLoaded: false, isDeleting: false, file }
     } else {
-      tempItems.push({ url: tempId, media_type, blur: false, isUploading: true, isDeleting: false, file })
+      tempItems.push({ url: tempId, media_type, blur: false, isUploading: true, isLoaded: false, isDeleting: false, file })
     }
   }
   
@@ -276,30 +281,38 @@ async function processFiles(files) {
   }
   
   let audioPromise = null
-  // Upload audio
   if (store.state.myProfile.audio && store.state.myProfile.audio.isUploading) {
     const tempAudio = store.state.myProfile.audio
     audioPromise = api.post('/profile/me/media', tempAudio.file, {
       headers: { 'Content-Type': tempAudio.file.type || 'application/octet-stream' }
     }).then(res => {
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading)
-      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
-      store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+      updateMediaList(res.data.media, remainingTemps)
+      if (res.data.audio) {
+          const oldAudio = store.state.myProfile.audio;
+          store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: false };
+      } else {
+          store.state.myProfile.audio = null;
+      }
     }).catch(e => {
       store.addToast("Failed to upload audio", "bi-exclamation-triangle")
       store.state.myProfile.audio = null
     })
   }
 
-  // Upload video/images concurrently
   const uploadPromises = tempItems.map(temp => {
     return api.post('/profile/me/media', temp.file, {
       headers: { 'Content-Type': temp.file.type || 'application/octet-stream' }
     }).then(res => {
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading && m.url !== temp.url)
-      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+      updateMediaList(res.data.media, remainingTemps)
       if (!store.state.myProfile.audio?.isUploading) {
-        store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+        if (res.data.audio) {
+            const oldAudio = store.state.myProfile.audio;
+            store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: oldAudio?.isLoaded };
+        } else {
+            store.state.myProfile.audio = null;
+        }
       }
     }).catch(e => {
       store.addToast("Failed to upload media", "bi-exclamation-triangle")
@@ -310,7 +323,6 @@ async function processFiles(files) {
   await Promise.all([audioPromise, ...uploadPromises].filter(Boolean))
 }
 
-// Full Workspace Drag-and-Drop Area Handling
 function workspaceDragEnter(e) {
   if (dragIndex === null) isDraggingFiles.value = true
 }
@@ -346,7 +358,7 @@ async function removeMedia(m, idx) {
     m.isDeleting = true
     const res = await api.delete(`/profile/me/media?url=${encodeURIComponent(m.url)}&index=${idx}`)
     const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
-    store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+    updateMediaList(res.data.media, remainingTemps)
   } catch (e) {
     m.isDeleting = false
     store.addToast("Failed to delete media", "bi-x-circle")
@@ -358,7 +370,7 @@ async function removeAudio() {
   try {
     store.state.myProfile.audio.isDeleting = true
     const res = await api.delete('/profile/me/audio')
-    store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+    store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false, isLoaded: false } : null
   } catch(e) {
     if (store.state.myProfile.audio) {
       store.state.myProfile.audio.isDeleting = false
@@ -373,10 +385,15 @@ async function toggleBlur(m, idx) {
     const newBlurState = !m.blur
     const res = await api.patch(`/profile/me/media/blur?url=${encodeURIComponent(m.url)}&blur=${newBlurState}&index=${idx}`)
     const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
-    store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+    updateMediaList(res.data.media, remainingTemps)
     
     if (!store.state.myProfile.audio?.isUploading) {
-      store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
+      if (res.data.audio) {
+          const oldAudio = store.state.myProfile.audio;
+          store.state.myProfile.audio = { ...res.data.audio, isDeleting: oldAudio?.isDeleting, isLoaded: oldAudio?.isLoaded };
+      } else {
+          store.state.myProfile.audio = null;
+      }
     }
   } catch(e) {
     m.isUpdatingBlur = false
@@ -384,7 +401,6 @@ async function toggleBlur(m, idx) {
   }
 }
 
-// Drag & Drop Reordering
 function dragStart(idx) { dragIndex = idx }
 function dragOver(idx) { dragOverIdx.value = idx }
 function dragLeave() { dragOverIdx.value = null }
@@ -402,7 +418,7 @@ async function drop(idx) {
       const urls = store.state.myProfile.media.filter(m => !m.isUploading).map(m => m.url)
       const res = await api.put('/profile/me/media/order', { urls })
       const remainingTemps = store.state.myProfile.media.filter(x => x.isUploading)
-      store.state.myProfile.media = [...res.data.media, ...remainingTemps]
+      updateMediaList(res.data.media, remainingTemps)
     } catch(e) {
       store.addToast("Failed to save media order", "bi-x-circle")
     }

@@ -12,7 +12,6 @@ class User:
     is_banned: bool = False
 
 class UserAlreadyExistsError(Exception):
-    """Raised when attempting to register a public key that is already registered."""
     pass
 
 @dataclass
@@ -54,6 +53,8 @@ class Handshake:
     status: str
     offered_contact: Optional[str] = None
     returned_contact: Optional[str] = None
+    sender_deleted: bool = False
+    receiver_deleted: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
@@ -65,6 +66,6 @@ class PoWChallenge:
 
 @dataclass
 class Ban:
-    type: str  # "ip", "fingerprint", "user_id"
+    type: str
     value: str
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

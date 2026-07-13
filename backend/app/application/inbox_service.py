@@ -16,18 +16,32 @@ class InboxService:
         self._profile_repo = profile_repo
 
     async def send_handshake(self, sender_id: str, receiver_id: str, handshake_type: str, offered_contact: str = None) -> Handshake:
-        h = Handshake(
-            id=uuid.uuid4().hex,
-            sender_id=sender_id,
-            receiver_id=receiver_id,
-            handshake_type=handshake_type,
-            status="pending",
-            offered_contact=offered_contact,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
-        )
-        await self._handshake_repo.create(h)
-        return h
+        existing = await self._handshake_repo.get_between_users(sender_id, receiver_id)
+        if existing:
+            existing.sender_id = sender_id
+            existing.receiver_id = receiver_id
+            existing.handshake_type = handshake_type
+            existing.status = "pending"
+            existing.offered_contact = offered_contact
+            existing.returned_contact = None
+            existing.sender_deleted = False
+            existing.receiver_deleted = False
+            existing.updated_at = datetime.now(timezone.utc)
+            await self._handshake_repo.update(existing)
+            return existing
+        else:
+            h = Handshake(
+                id=uuid.uuid4().hex,
+                sender_id=sender_id,
+                receiver_id=receiver_id,
+                handshake_type=handshake_type,
+                status="pending",
+                offered_contact=offered_contact,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            await self._handshake_repo.create(h)
+            return h
 
     async def resolve_handshake(self, user_id: str, handshake_id: str, status: str, returned_contact: str = None) -> Handshake:
         h = await self._handshake_repo.get_by_id(handshake_id)
@@ -38,18 +52,21 @@ class InboxService:
         if h.status != "pending":
             raise InvalidHandshakeStateError(f"Handshake is already {h.status}")
 
-        # Secure check: Verify that the other party is still active, has a non-rotated key, and is not banned
         other_id = h.sender_id if h.receiver_id == user_id else h.receiver_id
         from app.database import db_instance
         other_user = await db_instance.users_collection.find_one({"user_id": other_id})
         if not other_user:
-            raise OtherUserNotFoundError("User account no longer exists")
+            raise OtherUserNotFoundError("user account has been deleted")
         if other_user.get("is_banned"):
-            raise OtherUserBannedError("User account has been banned")
+            raise OtherUserBannedError("user account has been banned")
 
         h.status = status
         if status == "accepted" and returned_contact:
             h.returned_contact = returned_contact
+            
+        if status == "declined":
+            h.receiver_deleted = True
+            
         h.updated_at = datetime.now(timezone.utc)
 
         await self._handshake_repo.update(h)
@@ -62,7 +79,6 @@ class InboxService:
 
         other_user_ids = {h.sender_id if h.receiver_id == user_id else h.receiver_id for h in handshakes}
 
-        # Safe verification: Ensure other parties actually exist, have not deleted accounts, or are banned
         from app.database import db_instance
         active_users_cursor = db_instance.users_collection.find({
             "user_id": {"$in": list(other_user_ids)},
@@ -76,8 +92,6 @@ class InboxService:
         result = []
         for h in handshakes:
             other_id = h.sender_id if h.receiver_id == user_id else h.receiver_id
-            
-            # If the user is banned, deleted, or key-rotated, their handshake disappears completely
             if other_id not in active_user_ids:
                 continue
 

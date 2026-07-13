@@ -75,7 +75,9 @@ export default {
     contact_hidden_exchange: "[contact hidden until you accept]",
     account_banned: "This account has been banned due to a security policy violation.",
     existing_account_detected: "an existing session or footprint was detected. please log in with your key.",
-    delete_match: "delete match"
+    delete_match: "delete match",
+    no_matches: "no matches",
+    declined: "declined"
   },
   ru: {
     welcome_desc: "просто знакомства. без манипулятивных механик и агрессивной монетизации. будьте ответственны :^",
@@ -153,6 +155,8 @@ export default {
     contact_hidden_exchange: "[контакт скрыт до подтверждения]",
     account_banned: "Этот аккаунт заблокирован за нарушение правил безопасности.",
     existing_account_detected: "обнаружена существующая сессия или след. пожалуйста, войдите по ключу.",
-    delete_match: "удалить совпадение"
+    delete_match: "удалить совпадение",
+    no_matches: "нет совпадений",
+    declined: "отклонено"
   }
 };

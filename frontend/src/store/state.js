@@ -72,7 +72,7 @@ export function useStore() {
                     
                     await fetchTags(); 
                     await fetchMyProfile();
-                    await fetchInbox(); // Safe tracking: Sync active requests count on init
+                    await fetchInbox();
                 }
             }
         } catch (e) {
@@ -235,6 +235,8 @@ export function useStore() {
             const res = await api.get('/profile/me');
             const data = res.data;
             data.contacts.forEach(c => c._id = Math.random().toString());
+            data.media.forEach(m => { m.isLoaded = false; m.isUploading = false; });
+            if (data.audio) { data.audio.isLoaded = false; data.audio.isUploading = false; }
             state.myProfile = data;
             
             if (state.myProfile.contacts.length === 0) {
@@ -262,14 +264,18 @@ export function useStore() {
     async function fetchTags() {
         try {
             const res = await api.get('/tags/search');
-            state.availableSearchTags = res.data.map(t => ({ name: t.name, state: 'neutral' }));
+            state.availableSearchTags = res.data.map(t => ({ name: t.name, aliases: t.aliases || [], state: 'neutral' }));
         } catch (e) {}
     }
 
     async function fetchInbox() {
         try {
             const res = await api.get('/inbox');
-            state.inbox = res.data.map(r => ({...r, selectedContact: "", openDropdown: false, resolving: false}));
+            state.inbox = res.data.map(r => {
+              if (r.profile && r.profile.media) { r.profile.media.forEach(m => m.isLoaded = false); }
+              if (r.profile && r.profile.audio) { r.profile.audio.isLoaded = false; }
+              return {...r, selectedContact: "", openDropdown: false, resolving: false, isErrorDeleted: false}
+            });
         } catch (e) {}
     }
 

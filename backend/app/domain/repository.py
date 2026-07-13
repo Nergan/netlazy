@@ -97,6 +97,10 @@ class HandshakeRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_between_users(self, user_id_1: str, user_id_2: str) -> Optional[Handshake]:
+        ...
+
+    @abstractmethod
     async def get_interacted_user_ids(self, user_id: str) -> List[str]:
         ...
 
@@ -128,4 +132,8 @@ class SecurityRepository(ABC):
 
     @abstractmethod
     async def apply_bans(self, ips: List[str], fingerprints: List[str], user_id: str) -> None:
+        ...
+        
+    @abstractmethod
+    async def remove_bans(self, ips: List[str], fingerprints: List[str], user_id: str) -> None:
         ...

@@ -6,11 +6,9 @@ from app.domain.models import PoWChallenge
 from app.domain.repository import SecurityRepository, UserRepository
 
 class BannedError(Exception):
-    """Raised when IP, Fingerprint, or User ID is found in the cascade ban list."""
     pass
 
 class ProofOfWorkError(Exception):
-    """Raised when the Proof of Work challenge fails verification."""
     pass
 
 class SecurityService:
@@ -20,7 +18,6 @@ class SecurityService:
         self._difficulty = difficulty
 
     async def generate_challenge(self) -> dict:
-        """Creates a Proof of Work challenge and stores it for verification."""
         challenge = PoWChallenge(id=uuid.uuid4().hex, difficulty=self._difficulty)
         await self._security_repo.create_challenge(challenge)
         return {
@@ -29,10 +26,6 @@ class SecurityService:
         }
 
     async def verify_pow(self, challenge_id: str, nonce: str) -> None:
-        """
-        Consumes a PoW challenge atomically.
-        Calculates SHA256(challenge_id + nonce) and verifies it starts with `difficulty` zeros.
-        """
         challenge = await self._security_repo.consume_challenge(challenge_id)
         if not challenge:
             raise ProofOfWorkError("Challenge expired, invalid, or already consumed.")
@@ -46,15 +39,19 @@ class SecurityService:
             raise ProofOfWorkError("Invalid Proof of Work solution.")
 
     async def verify_not_banned(self, ip: str, fingerprint: str, user_id: Optional[str] = None) -> None:
-        """Checks cascade ban lists. Raises BannedError if matched."""
         if await self._security_repo.is_banned(ip, fingerprint, user_id):
+            if user_id:
+                user = await self._user_repo.get_by_id(user_id)
+                if user and not user.is_banned:
+                    await self._security_repo.remove_bans(
+                        ips=user.known_ips + ([ip] if ip else []),
+                        fingerprints=user.known_fingerprints + ([fingerprint] if fingerprint else []),
+                        user_id=user.user_id
+                    )
+                    return
             raise BannedError("Access denied by security policy.")
 
     async def cascade_ban_user(self, user_id: str) -> None:
-        """
-        Administrative action: extracts all known footprint vectors (IPs and Fingerprints) 
-        from the user's history and permanently blocks them globally.
-        """
         user = await self._user_repo.get_by_id(user_id)
         if not user:
             raise ValueError("User not found")

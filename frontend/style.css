@@ -101,7 +101,6 @@ body {
 .blurred-header { position: sticky; top: 0; z-index: 10; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
 .light-theme .blurred-header { background: rgba(254, 252, 245, 0.4); border-bottom: 1px solid var(--border-subtle); }
 
-/* Override: Increase search panel transparency and reduce background blur in tags search */
 .tag-library-header.blurred-header {
   background: rgba(0, 0, 0, 0.15) !important;
   backdrop-filter: blur(4px) !important;
@@ -117,7 +116,6 @@ body.light-theme .tag-library-header.blurred-header {
 .tag-library-pane { flex-grow: 1; border-right: 1px solid var(--border-subtle); background: var(--bg-surface); display: flex; flex-direction: column; min-width: 250px; position: relative; overflow-y: auto; }
 .tag-library-header { padding: 1rem 1.5rem; display: flex; align-items: center; margin-bottom: 0.5rem; }
 
-/* Workspace Container */
 .profile-workspace-pane { flex-shrink: 0; position: relative; background: var(--bg-base); outline: none; border-left: 1px solid var(--border-subtle); }
 .profile-workspace-pane:not(.is-resizing) { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .profile-workspace-pane.collapsed { border: none; }
@@ -132,7 +130,6 @@ body.light-theme .tag-library-header.blurred-header {
 .workspace-toggle-btn { position: absolute; left: 1.5rem; top: 1.65rem; z-index: 50; background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; transition: color 0.2s; outline: none; }
 .workspace-toggle-btn:hover { color: var(--text-main); }
 
-/* Collapsed Panel Toggle alignment */
 .profile-workspace-pane.collapsed .workspace-toggle-btn { left: -34px; top: 1.65rem; width: 34px; height: 50px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-right: none; border-radius: 25px 0 0 25px; display: flex; align-items: center; justify-content: center; box-shadow: -2px 2px 8px rgba(0,0,0,0.2); }
 
 /* ANIMATIONS */
@@ -173,7 +170,6 @@ body.light-theme .tag-library-header.blurred-header {
 .media-zone:hover { color: var(--text-main); border-color: var(--text-main); background: rgba(128,128,128,0.02); }
 .audio-player-zone { margin-bottom: 1.5rem; }
 
-/* Minimal Audio Player */
 .audio-minimal { height: 32px; outline: none; opacity: 0.8; transition: opacity 0.2s, filter 0.2s; border-radius: var(--radius-sm); background: transparent; filter: invert(1) hue-rotate(180deg); }
 .audio-minimal:hover { opacity: 1; }
 body.light-theme .audio-minimal { filter: none; }
@@ -228,7 +224,7 @@ body.light-theme .audio-minimal { filter: none; }
 .tag-scroll-area::-webkit-scrollbar { display: none; }
 
 /* CARDS MASONRY */
-.grid { column-width: 280px; column-gap: 1.5rem; width: 100%; padding-top: 1.5rem; } /* Shift top profiles down slightly to fully reveal card shadows and borders */
+.grid { column-width: 280px; column-gap: 1.5rem; width: 100%; padding-top: 1.5rem; }
 .card { display: inline-flex; flex-direction: column; width: 100%; margin-bottom: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; gap: 0.8rem; break-inside: avoid; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: var(--shadow-sm); }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
@@ -236,12 +232,17 @@ body.light-theme .audio-minimal { filter: none; }
 .card-media img, .card-media video { width: 100%; height: 100%; object-fit: cover; transition: 0.3s filter; }
 .is-blurred { filter: blur(20px); }
 
-/* INBOX SPLIT */
+/* INBOX SPLIT & ANIMATIONS */
 .inbox-layout { display: flex; height: 100%; width: 100%; margin: -2rem -3rem; position: absolute; top: 2rem; bottom: 0; left: 3rem; right: 3rem; }
-.inbox-col { display: flex; flex-direction: column; padding: 0 1.5rem; overflow-y: auto; }
-.inbox-item { margin-bottom: 1.5rem; transition: all 0.3s ease; }
+.inbox-col { display: flex; flex-direction: column; padding: 0 1.5rem; overflow-y: auto; position: relative; }
+.inbox-item { margin-bottom: 1.5rem; transition: all 0.3s ease; width: 100%; }
 .inbox-item.resolving { opacity: 0; transform: scale(0.95); }
 .inbox-item.error-deleted { opacity: 0; transform: scale(0.95); background-color: rgba(189, 106, 94, 0.1); border-color: var(--accent-danger); }
+
+.inbox-list-move, .inbox-list-enter-active, .inbox-list-leave-active { transition: all 0.4s ease; }
+.inbox-list-enter-from, .inbox-list-leave-to { opacity: 0; transform: scale(0.95); }
+.inbox-list-leave-active { position: absolute; right: 1.5rem; left: 1.5rem; }
+
 .offered-item { font-family: var(--font-main); font-size: 0.85rem; padding: 0.25rem 0.5rem; background: var(--bg-elevated); border-radius: var(--radius-sm); margin-top: 0.25rem; word-break: break-all; }
 
 /* CUSTOM DROPDOWN */
@@ -263,7 +264,7 @@ body.light-theme .audio-minimal { filter: none; }
 .toast-container { position: fixed; top: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 20000; pointer-events: none; }
 .toast { background: var(--bg-surface); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md); color: var(--text-main); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: var(--radius-pill); animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; }
 .toast.toast-minimal { background: transparent; border: none; box-shadow: none; color: var(--text-muted); }
-.toast.toast-danger { background: rgba(189, 106, 94, 0.9); border: 1px solid var(--accent-danger); color: #fff; }
+.toast.toast-danger { background: rgba(189, 106, 94, 0.15); border: 1px solid var(--accent-danger); color: var(--accent-danger); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { to { opacity: 0; } }
 
@@ -398,7 +399,7 @@ body.light-theme .audio-minimal { filter: none; }
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-subtle);
     border-bottom: none;
-    padding: 0.65rem 1.2rem !important; /* Slightly reduced height by 5px */
+    padding: 0.65rem 1.2rem !important;
     margin: 0 !important;
     box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
   }
