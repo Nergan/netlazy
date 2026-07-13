@@ -7,7 +7,6 @@ router = APIRouter(prefix="/tags", tags=["Tags"])
 
 class TagResponse(BaseModel):
     name: str
-    category: str
 
 @router.get("/search", response_model=List[TagResponse])
 async def search_tags(
@@ -17,4 +16,4 @@ async def search_tags(
         tags = await tag_service.browse()
     else:
         tags = await tag_service.search(q)
-    return [TagResponse(name=t.name, category=t.category) for t in tags]
+    return [TagResponse(name=t.name) for t in tags]

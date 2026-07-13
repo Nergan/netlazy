@@ -18,7 +18,6 @@ class UserAlreadyExistsError(Exception):
 @dataclass
 class Tag:
     name: str
-    category: str
     aliases: List[str] = field(default_factory=list)
     hidden: bool = False
 

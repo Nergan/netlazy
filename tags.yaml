@@ -1,37 +1,45 @@
 tags:
   - name: "tech"
-    category: "interests"
+    aliases: ["technology", "computers"]
   - name: "new york"
-    category: "geo"
+    aliases: ["location", "ny", "nyc"]
   - name: "introvert"
-    category: "personality"
+    aliases: ["personality", "quiet"]
   - name: "gamer"
-    category: "interests"
+    aliases: ["gaming", "videogames"]
   - name: "outdoors"
-    category: "lifestyle"
+    aliases: ["nature", "hiking"]
   - name: "coffee"
-    category: "lifestyle"
+    aliases: ["cafe", "drink"]
   - name: "art"
-    category: "interests"
+    aliases: ["creative", "drawing"]
   - name: "music"
-    category: "interests"
+    aliases: ["audio", "listening"]
   - name: "fitness"
-    category: "lifestyle"
+    aliases: ["workout", "health"]
   - name: "nightlife"
-    category: "lifestyle"
+    aliases: ["clubbing", "party"]
   - name: "reading"
-    category: "interests"
+    aliases: ["books", "literature"]
   - name: "travel"
-    category: "lifestyle"
+    aliases: ["vacation", "trip"]
   - name: "movies"
-    category: "interests"
+    aliases: ["cinema", "film"]
   - name: "cooking"
-    category: "lifestyle"
+    aliases: ["food", "culinary"]
   - name: "sports"
-    category: "interests"
+    aliases: ["athletics", "games"]
   - name: "gym rat"
-    category: "lifestyle"
+    aliases: ["gym", "lifting"]
   - name: "vegan"
-    category: "diet"
+    aliases: ["diet", "plant-based"]
   - name: "wine"
-    category: "lifestyle"
+    aliases: ["alcohol", "drink"]
+  - name: "25 years old"
+    aliases: ["age"]
+  - name: "26 years old"
+    aliases: ["age"]
+  - name: "27 years old"
+    aliases: ["age"]
+  - name: "london"
+    aliases: ["location", "uk"]

@@ -73,7 +73,9 @@ export default {
     confirm_delete_match_desc: "Are you sure you want to permanently delete this match? They will be removed from your connections list.",
     match_deleted: "Match removed successfully",
     contact_hidden_exchange: "[contact hidden until you accept]",
-    account_banned: "This account has been banned due to a security policy violation."
+    account_banned: "This account has been banned due to a security policy violation.",
+    existing_account_detected: "an existing session or footprint was detected. please log in with your key.",
+    delete_match: "delete match"
   },
   ru: {
     welcome_desc: "просто знакомства. без манипулятивных механик и агрессивной монетизации. будьте ответственны :^",
@@ -149,6 +151,8 @@ export default {
     confirm_delete_match_desc: "Вы уверены, что хотите навсегда удалить это совпадение? Пользователь будет удален из списка ваших контактов.",
     match_deleted: "Совпадение успешно удалено",
     contact_hidden_exchange: "[контакт скрыт до подтверждения]",
-    account_banned: "Этот аккаунт заблокирован за нарушение правил безопасности."
+    account_banned: "Этот аккаунт заблокирован за нарушение правил безопасности.",
+    existing_account_detected: "обнаружена существующая сессия или след. пожалуйста, войдите по ключу.",
+    delete_match: "удалить совпадение"
   }
 };

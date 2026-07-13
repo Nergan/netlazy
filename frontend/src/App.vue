@@ -7,6 +7,12 @@
         <h1 class="welcome-brand" style="color: var(--accent-danger);">banned</h1>
         <p class="welcome-desc">{{ store.t('account_banned') }}</p>
         
+        <div class="welcome-footer" style="margin-top: 2rem;">
+          <button class="create-btn" @click="checkBanStatus" style="font-size: 0.9rem; padding: 0.6rem 1.2rem;">
+            <i class="bi bi-arrow-clockwise"></i> Check Status
+          </button>
+        </div>
+
         <div class="welcome-footer">
           <button class="footer-action" @click="store.toggleTheme">
             <i class="bi" :class="store.state.theme === 'dark' ? 'bi-sun' : 'bi-moon'"></i> 
@@ -25,9 +31,12 @@
         <h1 class="welcome-brand">netlazy</h1>
         <p class="welcome-desc">{{ store.t('welcome_desc') }}</p>
         
-        <button class="create-btn" @click="store.createAccount">
+        <button v-if="!hasExistingAccounts" class="create-btn" @click="store.createAccount">
           <i class="bi bi-lightning-charge"></i> {{ store.t('create_account') }}
         </button>
+        <div v-else style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+          {{ store.t('existing_account_detected') }}
+        </div>
 
         <div class="import-key-wrapper">
           <input :type="importKeyVisible ? 'text' : 'password'" 
@@ -72,10 +81,11 @@
               <i class="bi bi-person-lines-fill"></i> <span v-if="!store.state.isSidebarCollapsed">{{ store.t('my_profile') }}</span>
             </a>
             <a class="nav-item" :class="{active: store.state.currentView === 'inbox'}" @click="store.state.currentView = 'inbox'" :title="store.t('inbox')">
-              <i class="bi bi-inbox"></i> 
+              <i v-if="!store.state.isSidebarCollapsed || pendingInboxCount === 0" class="bi bi-inbox"></i> 
+              <span v-else class="badge" style="margin: 0;">{{ pendingInboxCount }}</span>
               <span v-if="!store.state.isSidebarCollapsed">{{ store.t('inbox') }}</span>
               <!-- Received requests badge -->
-              <span class="badge" v-if="pendingInboxCount > 0">{{ pendingInboxCount }}</span>
+              <span class="badge" v-if="pendingInboxCount > 0 && !store.state.isSidebarCollapsed">{{ pendingInboxCount }}</span>
             </a>
           </div>
 
@@ -136,7 +146,7 @@
 
     <!-- Floating Toasts -->
     <div class="toast-container">
-      <div class="toast" v-for="toast in store.state.toasts" :key="toast.id" :class="{'toast-minimal': toast.type === 'minimal'}">
+      <div class="toast" v-for="toast in store.state.toasts" :key="toast.id" :class="{'toast-minimal': toast.type === 'minimal', 'toast-danger': toast.type === 'danger'}">
         <i class="bi" :class="toast.icon"></i> {{ toast.msg }}
       </div>
     </div>
@@ -162,8 +172,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useStore } from './store/state.js'
+import api from './utils/api.js'
 import Lightbox from './components/Lightbox.vue'
 import Editor from './components/Editor.vue'
 import Feed from './components/Feed.vue'
@@ -174,6 +185,7 @@ const importKeyInput = ref('')
 const keyVisible = ref(false)
 const importKeyVisible = ref(false)
 const isResizingSidebar = ref(false)
+const hasExistingAccounts = ref(false)
 
 const pendingInboxCount = computed(() => {
   return store.state.inbox.filter(r => r.status === 'pending' && !r.is_sender).length
@@ -187,6 +199,25 @@ const displayPrivateKey = computed(() => {
     .replace(/\r?\n|\r/g, '') // Strip off newline characters so styling container width can flow continuously
     .trim();
 })
+
+onMounted(async () => {
+  if (!store.state.isRegistered) {
+    try {
+      const res = await api.get('/auth/footprint-check')
+      hasExistingAccounts.value = res.data.has_accounts
+    } catch(e) {}
+  }
+})
+
+async function checkBanStatus() {
+  try {
+    await store.fetchMyProfile()
+    store.state.isBanned = false
+    store.addToast("Account restored", "bi-check-circle")
+  } catch (e) {
+    store.addToast("Account is still banned", "bi-x-circle")
+  }
+}
 
 function handleImport() {
   if (importKeyInput.value.trim()) {

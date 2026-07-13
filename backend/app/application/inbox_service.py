@@ -7,6 +7,8 @@ from app.domain.repository import HandshakeRepository, ProfileRepository
 class HandshakeNotFoundError(Exception): pass
 class InvalidHandshakeStateError(Exception): pass
 class UnauthorizedHandshakeActionError(Exception): pass
+class OtherUserNotFoundError(Exception): pass
+class OtherUserBannedError(Exception): pass
 
 class InboxService:
     def __init__(self, handshake_repo: HandshakeRepository, profile_repo: ProfileRepository):
@@ -39,12 +41,11 @@ class InboxService:
         # Secure check: Verify that the other party is still active, has a non-rotated key, and is not banned
         other_id = h.sender_id if h.receiver_id == user_id else h.receiver_id
         from app.database import db_instance
-        other_user = await db_instance.users_collection.find_one({
-            "user_id": other_id,
-            "is_banned": {"$ne": True}
-        })
+        other_user = await db_instance.users_collection.find_one({"user_id": other_id})
         if not other_user:
-            raise HandshakeNotFoundError("Handshake not found")
+            raise OtherUserNotFoundError("User account no longer exists")
+        if other_user.get("is_banned"):
+            raise OtherUserBannedError("User account has been banned")
 
         h.status = status
         if status == "accepted" and returned_contact:

@@ -33,22 +33,22 @@
             <div style="display: flex; justify-content: space-around; width: 100%; align-items: center;">
               <span :title="validPrivateContacts.length === 0 ? store.t('add_private_contact_tooltip') : 'share'" style="display: inline-flex;">
                 <button class="footer-action icon-btn" 
-                  :disabled="validPrivateContacts.length === 0"
+                  :disabled="validPrivateContacts.length === 0 || profile.isSendingReq"
                   :style="{ color: 'var(--accent-info)', opacity: validPrivateContacts.length === 0 ? 0.3 : 1, cursor: validPrivateContacts.length === 0 ? 'not-allowed' : 'pointer' }"
                   @click.stop="openContactSelect(profile, 'share')">
-                  <i class="bi bi-box-arrow-up"></i>
+                  <i class="bi" :class="profile.isSendingReq === 'share' ? 'bi-hourglass-split spin' : 'bi-box-arrow-up'"></i>
                 </button>
               </span>
               <span :title="validPrivateContacts.length === 0 ? store.t('add_private_contact_tooltip') : 'exchange'" style="display: inline-flex;">
                 <button class="footer-action icon-btn" 
-                  :disabled="validPrivateContacts.length === 0"
+                  :disabled="validPrivateContacts.length === 0 || profile.isSendingReq"
                   :style="{ color: 'var(--accent-moss)', opacity: validPrivateContacts.length === 0 ? 0.3 : 1, cursor: validPrivateContacts.length === 0 ? 'not-allowed' : 'pointer' }"
                   @click.stop="openContactSelect(profile, 'exchange')">
-                  <i class="bi bi-arrow-left-right"></i>
+                  <i class="bi" :class="profile.isSendingReq === 'exchange' ? 'bi-hourglass-split spin' : 'bi-arrow-left-right'"></i>
                 </button>
               </span>
-              <button class="footer-action icon-btn" style="color: var(--accent-danger);" @click.stop="sendRequest(profile, 'demand')" title="demand">
-                <i class="bi bi-box-arrow-in-down"></i>
+              <button class="footer-action icon-btn" :disabled="profile.isSendingReq" style="color: var(--accent-danger);" @click.stop="sendRequest(profile, 'demand')" title="demand">
+                <i class="bi" :class="profile.isSendingReq === 'demand' ? 'bi-hourglass-split spin' : 'bi-box-arrow-in-down'"></i>
               </button>
             </div>
           </template>
@@ -190,6 +190,7 @@ async function sendRequest(profile, type, contactValue = null) {
   store.addToast("Solving Proof of Work...", "bi-hourglass")
   
   try {
+    profile.isSendingReq = type
     const payload = {
       receiver_id: profile.user_id,
       type: type,
@@ -204,6 +205,8 @@ async function sendRequest(profile, type, contactValue = null) {
     
   } catch (e) {
     store.addToast("Failed to send handshake", "bi-x-circle")
+  } finally {
+    profile.isSendingReq = null
   }
 }
 

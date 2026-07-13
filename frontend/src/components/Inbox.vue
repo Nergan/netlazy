@@ -6,7 +6,7 @@
       <div class="inbox-col" :style="{width: store.state.inboxSplit + '%'}">
         <div style="color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0.5rem;">{{ store.t('received') }}</div>
         
-        <div class="inbox-item card" v-for="req in pendingRequests" :key="req.id" :class="{resolving: req.resolving}">
+        <div class="inbox-item card" v-for="req in pendingRequests" :key="req.id" :class="{resolving: req.resolving, 'error-deleted': req.isErrorDeleted}">
           
           <div v-if="req.profile && req.profile.audio" style="display:flex; align-items:center; margin-bottom: 0.5rem; width: 100%;">
             <audio class="audio-minimal" :src="req.profile.audio.url" controls style="flex-grow:1;"></audio>
@@ -140,6 +140,9 @@
           </div>
 
         </div>
+        <div v-if="sentRequests.length === 0" style="color:var(--text-muted); font-size:0.85rem; margin-bottom: 1.5rem;">
+          {{ store.t('no_pending') }}
+        </div>
       </div>
     </div>
   </div>
@@ -207,8 +210,12 @@ async function resolveRequest(req, status) {
   } catch (e) {
     req.resolving = false
     if (e.response && e.response.status === 404) {
-      store.addToast("User account no longer exists", "bi-info-circle")
-      store.state.inbox = store.state.inbox.filter(r => r.id !== req.id)
+      const isBanned = e.response.data.detail && e.response.data.detail.includes('banned')
+      store.addToast(e.response.data.detail || "User account no longer exists", isBanned ? "bi-slash-circle" : "bi-info-circle", "danger")
+      req.isErrorDeleted = true
+      setTimeout(() => {
+        store.state.inbox = store.state.inbox.filter(r => r.id !== req.id)
+      }, 600)
     } else {
       store.addToast("Failed to resolve handshake", "bi-x-circle")
     }
@@ -229,7 +236,7 @@ async function deleteMatch(req) {
       }
     },
     true,
-    store.t('delete_account'),
+    store.t('delete_match'),
     store.t('cancel')
   )
 }

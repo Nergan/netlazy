@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from app.application.auth_service import InvalidPublicKeyError
 from app.domain.models import UserAlreadyExistsError
@@ -28,6 +28,22 @@ class UserRotateRequest(BaseModel):
 class UserRotateResponse(BaseModel):
     new_user_id: str
     message: str
+
+@router.get("/footprint-check")
+async def check_footprint(request: Request):
+    from app.presentation.dependencies import _get_client_footprint
+    from app.database import db_instance
+    ip, fingerprint = _get_client_footprint(request)
+    
+    query = []
+    if ip: query.append({"known_ips": ip})
+    if fingerprint: query.append({"known_fingerprints": fingerprint})
+    
+    if not query:
+        return {"has_accounts": False}
+        
+    doc = await db_instance.users_collection.find_one({"$or": query})
+    return {"has_accounts": doc is not None}
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserRegisterResponse, dependencies=[Depends(verify_pow)])
 async def register(user_data: UserRegisterRequest):

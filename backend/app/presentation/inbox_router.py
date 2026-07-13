@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.domain.models import User
 from app.presentation.dependencies import inbox_service, profile_service, verify_request_signature, verify_pow, handshake_repo
 from app.presentation.profile_router import ProfileResponse, _to_response as profile_to_response
-from app.application.inbox_service import HandshakeNotFoundError, UnauthorizedHandshakeActionError, InvalidHandshakeStateError
+from app.application.inbox_service import HandshakeNotFoundError, UnauthorizedHandshakeActionError, InvalidHandshakeStateError, OtherUserNotFoundError, OtherUserBannedError
 
 router = APIRouter(prefix="/inbox", tags=["Inbox"])
 
@@ -60,6 +60,10 @@ async def resolve_handshake(handshake_id: str, body: HandshakeResolveRequest, us
         raise HTTPException(status_code=403, detail="Forbidden")
     except InvalidHandshakeStateError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except OtherUserNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except OtherUserBannedError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     sender_profile = await profile_service.get_or_create_profile(h.sender_id)
     return InboxItemResponse(

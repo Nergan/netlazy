@@ -95,7 +95,7 @@ class MongoTagRepository(TagRepository):
         for tag in tags:
             await db_instance.tags_collection.update_one(
                 {"name": tag.name},
-                {"$set": {"category": tag.category, "aliases": tag.aliases, "hidden": tag.hidden}},
+                {"$set": {"aliases": tag.aliases, "hidden": tag.hidden}},
                 upsert=True,
             )
         await db_instance.tags_collection.delete_many({"name": {"$nin": valid_names}})
@@ -129,7 +129,7 @@ class MongoTagRepository(TagRepository):
 
     def _to_domain(self, doc: dict) -> Tag:
         return Tag(
-            name=doc["name"], category=doc.get("category", "uncategorized"),
+            name=doc["name"],
             aliases=doc.get("aliases", []), hidden=doc.get("hidden", False),
         )
 

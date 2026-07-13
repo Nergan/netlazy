@@ -275,41 +275,39 @@ async function processFiles(files) {
     store.state.myProfile.media.push(...tempItems)
   }
   
+  let audioPromise = null
   // Upload audio
   if (store.state.myProfile.audio && store.state.myProfile.audio.isUploading) {
     const tempAudio = store.state.myProfile.audio
-    try {
-      const res = await api.post('/profile/me/media', tempAudio.file, {
-        headers: { 'Content-Type': tempAudio.file.type || 'application/octet-stream' }
-      })
+    audioPromise = api.post('/profile/me/media', tempAudio.file, {
+      headers: { 'Content-Type': tempAudio.file.type || 'application/octet-stream' }
+    }).then(res => {
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading)
       store.state.myProfile.media = [...res.data.media, ...remainingTemps]
       store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
-    } catch (e) {
+    }).catch(e => {
       store.addToast("Failed to upload audio", "bi-exclamation-triangle")
       store.state.myProfile.audio = null
-    }
+    })
   }
 
-  // Upload video/images sequentially to prevent API race conditions & accurately render UI placeholders
-  for (const temp of tempItems) {
-    try {
-      const res = await api.post('/profile/me/media', temp.file, {
-        headers: { 'Content-Type': temp.file.type || 'application/octet-stream' }
-      })
+  // Upload video/images concurrently
+  const uploadPromises = tempItems.map(temp => {
+    return api.post('/profile/me/media', temp.file, {
+      headers: { 'Content-Type': temp.file.type || 'application/octet-stream' }
+    }).then(res => {
       const remainingTemps = store.state.myProfile.media.filter(m => m.isUploading && m.url !== temp.url)
-      
       store.state.myProfile.media = [...res.data.media, ...remainingTemps]
-      
-      // Fix audio loading bug: Only assign if audio response is actually truthy
       if (!store.state.myProfile.audio?.isUploading) {
         store.state.myProfile.audio = res.data.audio ? { ...res.data.audio, isDeleting: false } : null
       }
-    } catch (e) {
+    }).catch(e => {
       store.addToast("Failed to upload media", "bi-exclamation-triangle")
       store.state.myProfile.media = store.state.myProfile.media.filter(m => m.url !== temp.url)
-    }
-  }
+    })
+  })
+
+  await Promise.all([audioPromise, ...uploadPromises].filter(Boolean))
 }
 
 // Full Workspace Drag-and-Drop Area Handling

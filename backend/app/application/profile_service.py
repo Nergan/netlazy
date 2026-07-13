@@ -1,4 +1,6 @@
+import asyncio
 import hashlib
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List
 from app.domain.models import Contact, MediaItem, Profile
@@ -35,6 +37,7 @@ class ProfileService:
         self._max_upload_bytes = max_upload_bytes
         self._image_max_dimension = image_max_dimension
         self._audio_bitrate = audio_bitrate
+        self._locks = defaultdict(asyncio.Lock)
 
     async def get_or_create_profile(self, user_id: str) -> Profile:
         profile = await self._profile_repo.get_by_user_id(user_id)
@@ -46,47 +49,46 @@ class ProfileService:
         unknown = [t for t in tags if t not in valid_names]
         if unknown: raise InvalidTagError(unknown)
 
-        profile = await self.get_or_create_profile(user_id)
-        profile.bio = bio[: self._max_bio_length]
-        profile.tags = tags
-        profile.contacts = contacts
-        profile.updated_at = datetime.now(timezone.utc)
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            profile.bio = bio[: self._max_bio_length]
+            profile.tags = tags
+            profile.contacts = contacts
+            profile.updated_at = datetime.now(timezone.utc)
 
-        await self._profile_repo.upsert(profile)
-        return profile
+            await self._profile_repo.upsert(profile)
+            return profile
 
     async def upload_media(self, user_id: str, raw_bytes: bytes) -> Profile:
         if len(raw_bytes) > self._max_upload_bytes:
             raise MediaProcessingError("File exceeds maximum upload size")
 
         file_hash = hashlib.sha256(raw_bytes).hexdigest()
-        profile = await self.get_or_create_profile(user_id)
+        
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            # Hash-based caching check: prevents duplicating identical files on the CDN 
+            existing_media = await self._profile_repo.find_media_by_hash(file_hash)
+            if existing_media:
+                if existing_media.media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
+                    raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
 
-        # Hash-based caching check: prevents duplicating identical files on the CDN 
-        existing_media = await self._profile_repo.find_media_by_hash(file_hash)
-        if existing_media:
-            if existing_media.media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
-                raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
+                item = MediaItem(url=existing_media.url, media_type=existing_media.media_type, blur=False, file_hash=file_hash)
+                if existing_media.media_type == "audio":
+                    profile.audio = item
+                else:
+                    profile.media.append(item)
+                
+                profile.updated_at = datetime.now(timezone.utc)
+                await self._profile_repo.upsert(profile)
+                return profile
 
-            item = MediaItem(url=existing_media.url, media_type=existing_media.media_type, blur=False, file_hash=file_hash)
-            if existing_media.media_type == "audio":
-                profile.audio = item
-            else:
-                profile.media.append(item)
-            
-            profile.updated_at = datetime.now(timezone.utc)
-            await self._profile_repo.upsert(profile)
-            return profile
-
-        # Proceed with normal processing if hash doesn't exist
+        # Proceed with normal processing if hash doesn't exist (done concurrently outside lock)
         mime_type = media_processor.sniff_mime_type(raw_bytes)
         try:
             media_type = media_processor.classify_media_type(mime_type)
         except media_processor.UnsupportedMediaTypeError as e:
             raise UnsupportedMediaTypeError(str(e)) from e
-
-        if media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
-            raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
 
         try:
             if media_type == "image":
@@ -102,106 +104,117 @@ class ProfileService:
         url = await self._media_storage.upload(processed, media_type, public_id_hint)
         item = MediaItem(url=url, media_type=media_type, blur=False, file_hash=file_hash)
 
-        if media_type == "audio":
-            profile.audio = item
-        else:
-            profile.media.append(item)
+        # Atomic apply of the uploaded media into the user's database document
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            if media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
+                raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
+                
+            if media_type == "audio":
+                profile.audio = item
+            else:
+                profile.media.append(item)
 
-        profile.updated_at = datetime.now(timezone.utc)
-        await self._profile_repo.upsert(profile)
-        return profile
-
-    async def remove_media(self, user_id: str, media_url: str, index: int = None) -> Profile:
-        profile = await self.get_or_create_profile(user_id)
-        
-        target = None
-        if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
-            target = profile.media.pop(index)
-        else:
-            for i, m in enumerate(profile.media):
-                if m.url == media_url:
-                    target = m
-                    profile.media.pop(i)
-                    break
-        
-        if not target:
-            raise MediaNotFoundError(f"No media item with url {media_url}")
-
-        profile.updated_at = datetime.now(timezone.utc)
-        await self._profile_repo.upsert(profile)
-
-        # Cleanup isolated CDN files only if no active references exist anywhere in the database
-        if target.file_hash:
-            count = await self._profile_repo.count_media_usage(target.file_hash)
-            if count == 0:
-                await self._media_storage.delete(target.url)
-
-        return profile
-
-    async def clear_audio(self, user_id: str) -> Profile:
-        profile = await self.get_or_create_profile(user_id)
-        if not profile.audio:
+            profile.updated_at = datetime.now(timezone.utc)
+            await self._profile_repo.upsert(profile)
             return profile
 
-        target = profile.audio
-        profile.audio = None
-        profile.updated_at = datetime.now(timezone.utc)
-        await self._profile_repo.upsert(profile)
+    async def remove_media(self, user_id: str, media_url: str, index: int = None) -> Profile:
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            
+            target = None
+            if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
+                target = profile.media.pop(index)
+            else:
+                for i, m in enumerate(profile.media):
+                    if m.url == media_url:
+                        target = m
+                        profile.media.pop(i)
+                        break
+            
+            if not target:
+                raise MediaNotFoundError(f"No media item with url {media_url}")
 
-        # Cleanup isolated CDN files only if no active references exist anywhere in the database
-        if target.file_hash:
-            count = await self._profile_repo.count_media_usage(target.file_hash)
-            if count == 0:
-                await self._media_storage.delete(target.url)
+            profile.updated_at = datetime.now(timezone.utc)
+            await self._profile_repo.upsert(profile)
 
-        return profile
+            # Cleanup isolated CDN files only if no active references exist anywhere in the database
+            if target.file_hash:
+                count = await self._profile_repo.count_media_usage(target.file_hash)
+                if count == 0:
+                    await self._media_storage.delete(target.url)
+
+            return profile
+
+    async def clear_audio(self, user_id: str) -> Profile:
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            if not profile.audio:
+                return profile
+
+            target = profile.audio
+            profile.audio = None
+            profile.updated_at = datetime.now(timezone.utc)
+            await self._profile_repo.upsert(profile)
+
+            # Cleanup isolated CDN files only if no active references exist anywhere in the database
+            if target.file_hash:
+                count = await self._profile_repo.count_media_usage(target.file_hash)
+                if count == 0:
+                    await self._media_storage.delete(target.url)
+
+            return profile
 
     async def set_media_blur(self, user_id: str, media_url: str, blur: bool, index: int = None) -> Profile:
-        profile = await self.get_or_create_profile(user_id)
-        found = False
-        
-        if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
-            profile.media[index].blur = blur
-            found = True
-        else:
-            for m in profile.media:
-                if m.url == media_url:
-                    m.blur = blur
-                    found = True
-                    break
-            if not found and profile.audio and profile.audio.url == media_url:
-                profile.audio.blur = blur
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            found = False
+            
+            if index is not None and 0 <= index < len(profile.media) and profile.media[index].url == media_url:
+                profile.media[index].blur = blur
                 found = True
-                
-        if not found:
-            raise MediaNotFoundError(f"No media item with url {media_url}")
+            else:
+                for m in profile.media:
+                    if m.url == media_url:
+                        m.blur = blur
+                        found = True
+                        break
+                if not found and profile.audio and profile.audio.url == media_url:
+                    profile.audio.blur = blur
+                    found = True
+                    
+            if not found:
+                raise MediaNotFoundError(f"No media item with url {media_url}")
 
-        profile.updated_at = datetime.now(timezone.utc)
-        await self._profile_repo.upsert(profile)
-        return profile
+            profile.updated_at = datetime.now(timezone.utc)
+            await self._profile_repo.upsert(profile)
+            return profile
 
     async def reorder_media(self, user_id: str, ordered_urls: List[str]) -> Profile:
-        profile = await self.get_or_create_profile(user_id)
-        current_urls = {m.url for m in profile.media}
-        
-        if set(ordered_urls) != current_urls or len(ordered_urls) != len(profile.media):
-            raise ValueError("Payload must contain the exact current URLs for reordering")
+        async with self._locks[user_id]:
+            profile = await self.get_or_create_profile(user_id)
+            current_urls = {m.url for m in profile.media}
+            
+            if set(ordered_urls) != current_urls or len(ordered_urls) != len(profile.media):
+                raise ValueError("Payload must contain the exact current URLs for reordering")
 
-        url_to_media = {m.url: m for m in profile.media}
-        profile.media = [url_to_media[url] for url in ordered_urls]
-        profile.updated_at = datetime.now(timezone.utc)
-        await self._profile_repo.upsert(profile)
-        return profile
+            url_to_media = {m.url: m for m in profile.media}
+            profile.media = [url_to_media[url] for url in ordered_urls]
+            profile.updated_at = datetime.now(timezone.utc)
+            await self._profile_repo.upsert(profile)
+            return profile
 
     async def delete_profile(self, user_id: str) -> None:
-        profile = await self._profile_repo.get_by_user_id(user_id)
-        if profile:
-            media_items = profile.media + ([profile.audio] if profile.audio else [])
-            await self._profile_repo.delete(user_id)
-            
-            # Cascade CDN cleanup for files unlinked by profile destruction
-            for m in media_items:
-                if m.file_hash:
-                    count = await self._profile_repo.count_media_usage(m.file_hash)
-                    if count == 0:
-                        await self._media_storage.delete(m.url)
+        async with self._locks[user_id]:
+            profile = await self._profile_repo.get_by_user_id(user_id)
+            if profile:
+                media_items = profile.media + ([profile.audio] if profile.audio else [])
+                await self._profile_repo.delete(user_id)
+                
+                # Cascade CDN cleanup for files unlinked by profile destruction
+                for m in media_items:
+                    if m.file_hash:
+                        count = await self._profile_repo.count_media_usage(m.file_hash)
+                        if count == 0:
+                            await self._media_storage.delete(m.url)

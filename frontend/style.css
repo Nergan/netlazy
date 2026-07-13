@@ -241,6 +241,7 @@ body.light-theme .audio-minimal { filter: none; }
 .inbox-col { display: flex; flex-direction: column; padding: 0 1.5rem; overflow-y: auto; }
 .inbox-item { margin-bottom: 1.5rem; transition: all 0.3s ease; }
 .inbox-item.resolving { opacity: 0; transform: scale(0.95); }
+.inbox-item.error-deleted { opacity: 0; transform: scale(0.95); background-color: rgba(189, 106, 94, 0.1); border-color: var(--accent-danger); }
 .offered-item { font-family: var(--font-main); font-size: 0.85rem; padding: 0.25rem 0.5rem; background: var(--bg-elevated); border-radius: var(--radius-sm); margin-top: 0.25rem; word-break: break-all; }
 
 /* CUSTOM DROPDOWN */
@@ -262,6 +263,7 @@ body.light-theme .audio-minimal { filter: none; }
 .toast-container { position: fixed; top: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 20000; pointer-events: none; }
 .toast { background: var(--bg-surface); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md); color: var(--text-main); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: var(--radius-pill); animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; }
 .toast.toast-minimal { background: transparent; border: none; box-shadow: none; color: var(--text-muted); }
+.toast.toast-danger { background: rgba(189, 106, 94, 0.9); border: 1px solid var(--accent-danger); color: #fff; }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { to { opacity: 0; } }
 

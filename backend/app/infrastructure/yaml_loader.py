@@ -16,10 +16,11 @@ def load_tags_from_yaml(path: str) -> List[Tag]:
 
     tags = []
     for entry in raw.get("tags", []):
+        aliases = entry.get("aliases", [])
+        is_hidden = entry.get("hidden", False) or "age" in aliases or "location" in aliases
         tags.append(Tag(
             name=entry["name"],
-            category=entry.get("category", "uncategorized"),
-            aliases=entry.get("aliases", []),
-            hidden=entry.get("hidden", False),
+            aliases=aliases,
+            hidden=is_hidden,
         ))
     return tags

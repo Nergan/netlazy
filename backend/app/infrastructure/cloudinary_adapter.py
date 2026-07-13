@@ -10,6 +10,7 @@ cloudinary.config(
     api_key=settings.cloudinary_api_key,
     api_secret=settings.cloudinary_api_secret,
     secure=True,
+    urllib3_kwargs={'maxsize': 10}
 )
 
 _RESOURCE_TYPE_MAP = {"image": "image", "video": "video", "audio": "video"}
