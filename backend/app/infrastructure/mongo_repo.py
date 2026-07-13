@@ -5,6 +5,13 @@ from app.database import db_instance
 from app.domain.models import Contact, Handshake, MediaItem, PoWChallenge, Profile, Tag, User, UserAlreadyExistsError
 from app.domain.repository import HandshakeRepository, NonceRepository, ProfileRepository, SecurityRepository, TagRepository, UserRepository
 
+def _force_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 class MongoUserRepository(UserRepository):
     async def create(self, user: User) -> None:
         try:
@@ -25,7 +32,7 @@ class MongoUserRepository(UserRepository):
         return User(
             user_id=doc["user_id"],
             public_key_pem=doc["public_key"],
-            created_at=doc["created_at"],
+            created_at=_force_utc(doc["created_at"]),
             known_ips=doc.get("known_ips", []),
             known_fingerprints=doc.get("known_fingerprints", []),
             is_banned=doc.get("is_banned", False),
@@ -67,7 +74,7 @@ class MongoSecurityRepository(SecurityRepository):
     async def consume_challenge(self, challenge_id: str) -> Optional[PoWChallenge]:
         doc = await db_instance.challenges_collection.find_one_and_delete({"id": challenge_id})
         if not doc: return None
-        return PoWChallenge(id=doc["id"], difficulty=doc["difficulty"], created_at=doc["created_at"])
+        return PoWChallenge(id=doc["id"], difficulty=doc["difficulty"], created_at=_force_utc(doc["created_at"]))
 
     async def is_banned(self, ip: str, fingerprint: str, user_id: Optional[str] = None) -> bool:
         queries = []
@@ -226,8 +233,8 @@ class MongoProfileRepository(ProfileRepository):
             media=[self._media_from_doc(m) for m in doc.get("media", [])],
             audio=self._media_from_doc(doc["audio"]) if doc.get("audio") else None,
             contacts=[self._contact_from_doc(c) for c in doc.get("contacts", [])],
-            created_at=doc.get("created_at", datetime.now(timezone.utc)),
-            updated_at=doc.get("updated_at"),
+            created_at=_force_utc(doc.get("created_at")) or datetime.now(timezone.utc),
+            updated_at=_force_utc(doc.get("updated_at")),
         )
 
     def _media_to_doc(self, m: MediaItem) -> dict: return {"url": m.url, "media_type": m.media_type, "blur": m.blur, "file_hash": m.file_hash}
@@ -302,5 +309,5 @@ class MongoHandshakeRepository(HandshakeRepository):
             handshake_type=doc["handshake_type"], status=doc["status"],
             offered_contact=doc.get("offered_contact"), returned_contact=doc.get("returned_contact"),
             sender_deleted=doc.get("sender_deleted", False), receiver_deleted=doc.get("receiver_deleted", False),
-            created_at=doc["created_at"], updated_at=doc.get("updated_at")
+            created_at=_force_utc(doc["created_at"]), updated_at=_force_utc(doc.get("updated_at"))
         )

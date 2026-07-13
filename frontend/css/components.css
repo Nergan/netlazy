@@ -1,5 +1,5 @@
 /* INPUTS */
-.seamless-input { width: 100%; background: transparent; border: none; color: var(--text-main); outline: none; resize: none; text-transform: lowercase; }
+.seamless-input { width: 100%; background: transparent; border: none; color: var(--text-main); outline: none; resize: none; }
 .seamless-input::placeholder { color: var(--text-muted); opacity: 0.6; }
 .editor-bio { font-size: 1rem; line-height: 1.6; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; margin-bottom: 2rem; transition: border-color 0.3s; text-transform: none; }
 .editor-bio:focus { border-color: var(--border-focus); }

@@ -29,12 +29,9 @@
         <h1 class="welcome-brand">netlazy</h1>
         <p class="welcome-desc">{{ store.t('welcome_desc') }}</p>
         
-        <button v-if="!hasExistingAccounts" class="create-btn" @click="store.createAccount">
+        <button class="create-btn" @click="store.createAccount">
           <i class="bi bi-lightning-charge"></i> {{ store.t('create_account') }}
         </button>
-        <div v-else style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-          {{ store.t('existing_account_detected') }}
-        </div>
 
         <div class="import-key-wrapper">
           <input :type="importKeyVisible ? 'text' : 'password'" 
@@ -163,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useStore } from './store/state.js'
 import api from './utils/api.js'
 import Lightbox from './components/Lightbox.vue'
@@ -176,7 +173,6 @@ const importKeyInput = ref('')
 const keyVisible = ref(false)
 const importKeyVisible = ref(false)
 const isResizingSidebar = ref(false)
-const hasExistingAccounts = ref(false)
 
 const pendingInboxCount = computed(() => {
   return store.state.inbox.filter(r => r.status === 'pending' && !r.is_sender).length
@@ -189,27 +185,6 @@ const displayPrivateKey = computed(() => {
     .replace(/-----END PRIVATE KEY-----/g, '')
     .replace(/\r?\n|\r/g, '')
     .trim();
-})
-
-onMounted(async () => {
-  if (!store.state.isRegistered) {
-    try {
-      const res = await api.get('/auth/footprint-check')
-      hasExistingAccounts.value = res.data.has_accounts
-    } catch(e) {}
-  }
-})
-
-// Dynamic watcher to re-evaluate accounts check if login status changes (e.g. logouts / deletions)
-watch(() => store.state.isRegistered, async (newVal) => {
-  if (!newVal) {
-    try {
-      const res = await api.get('/auth/footprint-check')
-      hasExistingAccounts.value = res.data.has_accounts
-    } catch(e) {
-      hasExistingAccounts.value = false
-    }
-  }
 })
 
 async function checkBanStatus() {

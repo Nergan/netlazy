@@ -42,7 +42,7 @@ def verify_signature(public_key_pem: str, payload: bytes, signature: bytes) -> N
             payload,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
+                salt_length=padding.PSS.AUTO
             ),
             hashes.SHA256()
         )
