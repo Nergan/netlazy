@@ -77,14 +77,31 @@
 .welcome-container { display: flex; align-items: center; justify-content: center; height: 100vh; width: 100vw; background: var(--bg-base); padding: 2rem; }
 .welcome-box { max-width: 500px; width: 100%; text-align: center; display: flex; flex-direction: column; gap: 2rem; margin-top: -10vh; }
 .welcome-brand {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: 3rem;
   font-weight: 700;
   color: var(--text-main);
-  cursor: default;
+  cursor: pointer;
   text-shadow: var(--glow-accent);
+  transition: color 0.2s ease;
+}
+.welcome-brand:hover {
+  color: var(--accent-moss);
+}
+.create-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--accent-moss);
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: var(--shadow-sm);
+}
+.create-btn:hover {
+  border-color: var(--accent-moss);
+  background: var(--bg-elevated);
+  box-shadow: var(--glow-accent);
 }
 
 .import-key-wrapper { position: relative; width: 100%; display: flex; align-items: center; }

@@ -1,6 +1,6 @@
 export default {
   en: {
-    welcome_desc: "Just dating. No manipulative mechanics, no aggressive monetization. be responsible :^",
+    welcome_desc: "Just dating. No manipulative mechanics, no aggressive monetization. Be responsible :^",
     create_account: "create account in one click",
     light_mode: "light",
     dark_mode: "dark",
