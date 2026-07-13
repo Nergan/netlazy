@@ -26,7 +26,7 @@
 
     <div v-else-if="!store.state.isRegistered" class="welcome-container">
       <div class="welcome-box">
-        <h1 class="welcome-brand">netlazy</h1>
+        <h1 class="welcome-brand">netlazy<img src="https://cdn.jsdelivr.net/gh/Nergan/media@main/netlazy/favicon.png" class="brand-logo" alt="logo"></h1>
         <p class="welcome-desc">{{ store.t('welcome_desc') }}</p>
         
         <button class="create-btn" @click="store.createAccount">
@@ -61,7 +61,7 @@
         <div class="resizer-v" @mousedown="startResize"></div>
         <div class="sidebar-content">
           <div class="brand-row">
-            <div class="brand" v-if="!store.state.isSidebarCollapsed" @click="store.state.currentView = 'feed'">netlazy</div>
+            <div class="brand" v-if="!store.state.isSidebarCollapsed" @click="store.state.currentView = 'feed'">netlazy<img src="https://cdn.jsdelivr.net/gh/Nergan/media@main/netlazy/favicon.png" class="brand-logo" alt="logo"></div>
             <button class="collapse-btn" @click="store.state.isSidebarCollapsed = !store.state.isSidebarCollapsed" :style="{ margin: store.state.isSidebarCollapsed ? '0 auto' : '0' }">
               <i class="bi" :class="store.state.isSidebarCollapsed ? 'bi-list' : 'bi-chevron-left'"></i>
             </button>
