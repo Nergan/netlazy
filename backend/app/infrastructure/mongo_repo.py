@@ -109,6 +109,10 @@ class MongoTagRepository(TagRepository):
         await db_instance.tags_collection.delete_many({"name": {"$nin": valid_names}})
         await db_instance.profiles_collection.update_many({}, {"$pull": {"tags": {"$nin": valid_names}}})
 
+    async def get_all_tags(self) -> List[Tag]:
+        cursor = db_instance.tags_collection.find({})
+        return [self._to_domain(doc) async for doc in cursor]
+
     async def list_visible(self) -> List[Tag]:
         cursor = db_instance.tags_collection.find({"hidden": False})
         return [self._to_domain(doc) async for doc in cursor]
@@ -256,12 +260,10 @@ class MongoHandshakeRepository(HandshakeRepository):
         return [self._to_domain(doc) async for doc in cursor]
 
     async def get_interacted_user_ids(self, user_id: str) -> List[str]:
-        cursor = db_instance.handshakes_collection.find({
-            "$or": [
-                {"sender_id": user_id, "sender_deleted": {"$ne": True}},
-                {"receiver_id": user_id, "receiver_deleted": {"$ne": True}}
-            ]
-        })
+        # Strict logic: NEVER return interactions in feed even if soft-deleted
+        cursor = db_instance.handshakes_collection.find(
+            {"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]}
+        )
         interacted = set()
         async for doc in cursor:
             if doc["sender_id"] != user_id: interacted.add(doc["sender_id"])

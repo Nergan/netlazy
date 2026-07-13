@@ -19,8 +19,8 @@
                      <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
                    </div>
                  </template>
-                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               </div>
             </div>
 
@@ -85,8 +85,8 @@
                      <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
                    </div>
                  </template>
-                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               </div>
             </div>
 
@@ -136,8 +136,8 @@
                      <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
                    </div>
                  </template>
-                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               </div>
             </div>
 
@@ -173,8 +173,8 @@
                      <i class="bi bi-arrow-repeat spin" style="font-size: 1.5rem; color: var(--text-muted);"></i>
                    </div>
                  </template>
-                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
-                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
+                 <img v-if="m.media_type === 'image'" v-show="m.isLoaded" :src="m.url" @load="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" :class="{'is-blurred': m.blur}">
+                 <video v-else-if="m.media_type === 'video'" v-show="m.isLoaded" :src="m.url" @loadeddata="m.isLoaded = true" @error="m.isLoaded = true" style="width:100%; height:100%; object-fit:cover;" muted autoplay loop :class="{'is-blurred': m.blur}"></video>
               </div>
             </div>
 

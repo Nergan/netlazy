@@ -19,8 +19,6 @@ class MediaProcessingError(Exception):
     pass
 
 def sniff_mime_type(data: bytes) -> str:
-    """Inspects structural byte signatures rather than trusting file
-    extensions or client-supplied Content-Type headers."""
     return magic.from_buffer(data, mime=True)
 
 def classify_media_type(mime_type: str) -> str:
@@ -50,20 +48,28 @@ async def _run_ffmpeg(args: list) -> None:
         raise MediaProcessingError("Media processing failed")
 
 async def process_image(data: bytes, max_dimension: int) -> bytes:
-    """Scales to a bounding box (preserving aspect ratio, never upscaling)
-    and converts to compressed WebP."""
     async with _temp_workspace(data, "output.webp") as (in_path, out_path):
-        scale_filter = (
-            f"scale='min({max_dimension},iw)':'min({max_dimension},ih)':"
-            "force_original_aspect_ratio=decrease"
-        )
+        scale_filter = f"scale='min({max_dimension},iw)':'min({max_dimension},ih)':force_original_aspect_ratio=decrease"
         await _run_ffmpeg(["-y", "-i", in_path, "-vf", scale_filter, "-quality", "82", out_path])
         with open(out_path, "rb") as f:
             return f.read()
 
+async def process_video(data: bytes, max_dimension: int) -> bytes:
+    async with _temp_workspace(data, "output.mp4") as (in_path, out_path):
+        scale_filter = f"scale='min({max_dimension},iw)':'min({max_dimension},ih)':force_original_aspect_ratio=decrease"
+        await _run_ffmpeg([
+            "-y", "-i", in_path, 
+            "-vf", scale_filter, 
+            "-c:v", "libx264", "-preset", "fast", "-crf", "28", 
+            "-c:a", "aac", "-b:a", "128k", 
+            "-movflags", "+faststart", 
+            out_path
+        ])
+        with open(out_path, "rb") as f:
+            return f.read()
+
 async def process_audio(data: bytes, bitrate: str) -> bytes:
-    """Extracts and re-encodes the audio stream to mono AAC."""
-    async with _temp_workspace(data, "output.m4a") as (in_path, out_path):
-        await _run_ffmpeg(["-y", "-i", in_path, "-vn", "-ac", "1", "-c:a", "aac", "-b:a", bitrate, out_path])
+    async with _temp_workspace(data, "output.mp3") as (in_path, out_path):
+        await _run_ffmpeg(["-y", "-i", in_path, "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", bitrate, out_path])
         with open(out_path, "rb") as f:
             return f.read()

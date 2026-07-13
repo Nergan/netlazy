@@ -92,6 +92,7 @@ async def reorder_media(body: MediaOrderRequest, user: User = Depends(verify_req
 @router.post("/me/media", response_model=ProfileResponse)
 async def upload_media(
     request: Request,
+    blur: bool = False,
     user: User = Depends(verify_request_signature),
 ):
     raw_bytes = await request.body()
@@ -99,7 +100,7 @@ async def upload_media(
         raise HTTPException(status_code=400, detail="Empty body")
 
     try:
-        profile = await profile_service.upload_media(user.user_id, raw_bytes)
+        profile = await profile_service.upload_media(user.user_id, raw_bytes, blur=blur)
     except UnsupportedMediaTypeError as e:
         raise HTTPException(status_code=415, detail=str(e))
     except MediaLimitExceededError as e:

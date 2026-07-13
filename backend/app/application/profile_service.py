@@ -59,7 +59,7 @@ class ProfileService:
             await self._profile_repo.upsert(profile)
             return profile
 
-    async def upload_media(self, user_id: str, raw_bytes: bytes) -> Profile:
+    async def upload_media(self, user_id: str, raw_bytes: bytes, blur: bool = False) -> Profile:
         if len(raw_bytes) > self._max_upload_bytes:
             raise MediaProcessingError("File exceeds maximum upload size")
 
@@ -67,13 +67,12 @@ class ProfileService:
         
         async with self._locks[user_id]:
             profile = await self.get_or_create_profile(user_id)
-            # Hash-based caching check: prevents duplicating identical files on the CDN 
             existing_media = await self._profile_repo.find_media_by_hash(file_hash)
             if existing_media:
                 if existing_media.media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
                     raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
 
-                item = MediaItem(url=existing_media.url, media_type=existing_media.media_type, blur=False, file_hash=file_hash)
+                item = MediaItem(url=existing_media.url, media_type=existing_media.media_type, blur=blur, file_hash=file_hash)
                 if existing_media.media_type == "audio":
                     profile.audio = item
                 else:
@@ -83,7 +82,6 @@ class ProfileService:
                 await self._profile_repo.upsert(profile)
                 return profile
 
-        # Proceed with normal processing if hash doesn't exist (done concurrently outside lock)
         mime_type = media_processor.sniff_mime_type(raw_bytes)
         try:
             media_type = media_processor.classify_media_type(mime_type)
@@ -93,6 +91,8 @@ class ProfileService:
         try:
             if media_type == "image":
                 processed = await media_processor.process_image(raw_bytes, self._image_max_dimension)
+            elif media_type == "video":
+                processed = await media_processor.process_video(raw_bytes, self._image_max_dimension)
             elif media_type == "audio":
                 processed = await media_processor.process_audio(raw_bytes, self._audio_bitrate)
             else:
@@ -102,9 +102,8 @@ class ProfileService:
 
         public_id_hint = f"{user_id}/{media_type}_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
         url = await self._media_storage.upload(processed, media_type, public_id_hint)
-        item = MediaItem(url=url, media_type=media_type, blur=False, file_hash=file_hash)
+        item = MediaItem(url=url, media_type=media_type, blur=blur, file_hash=file_hash)
 
-        # Atomic apply of the uploaded media into the user's database document
         async with self._locks[user_id]:
             profile = await self.get_or_create_profile(user_id)
             if media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
@@ -139,7 +138,6 @@ class ProfileService:
             profile.updated_at = datetime.now(timezone.utc)
             await self._profile_repo.upsert(profile)
 
-            # Cleanup isolated CDN files only if no active references exist anywhere in the database
             if target.file_hash:
                 count = await self._profile_repo.count_media_usage(target.file_hash)
                 if count == 0:
@@ -158,7 +156,6 @@ class ProfileService:
             profile.updated_at = datetime.now(timezone.utc)
             await self._profile_repo.upsert(profile)
 
-            # Cleanup isolated CDN files only if no active references exist anywhere in the database
             if target.file_hash:
                 count = await self._profile_repo.count_media_usage(target.file_hash)
                 if count == 0:
@@ -212,7 +209,6 @@ class ProfileService:
                 media_items = profile.media + ([profile.audio] if profile.audio else [])
                 await self._profile_repo.delete(user_id)
                 
-                # Cascade CDN cleanup for files unlinked by profile destruction
                 for m in media_items:
                     if m.file_hash:
                         count = await self._profile_repo.count_media_usage(m.file_hash)

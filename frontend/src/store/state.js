@@ -264,17 +264,28 @@ export function useStore() {
     async function fetchTags() {
         try {
             const res = await api.get('/tags/search');
-            state.availableSearchTags = res.data.map(t => ({ name: t.name, aliases: t.aliases || [], state: 'neutral' }));
+            state.availableSearchTags = res.data.map(t => ({ name: t.name, aliases: t.aliases || [], hidden: t.hidden, state: 'neutral' }));
         } catch (e) {}
     }
 
     async function fetchInbox() {
         try {
             const res = await api.get('/inbox');
+            const oldInbox = state.inbox || [];
+            
             state.inbox = res.data.map(r => {
-              if (r.profile && r.profile.media) { r.profile.media.forEach(m => m.isLoaded = false); }
-              if (r.profile && r.profile.audio) { r.profile.audio.isLoaded = false; }
-              return {...r, selectedContact: "", openDropdown: false, resolving: false, isErrorDeleted: false}
+                const oldR = oldInbox.find(old => old.id === r.id);
+                if (r.profile && r.profile.media) {
+                    r.profile.media.forEach(m => {
+                        const oldM = oldR?.profile?.media?.find(om => om.url === m.url);
+                        m.isLoaded = oldM ? oldM.isLoaded : false;
+                    });
+                }
+                if (r.profile && r.profile.audio) {
+                    const oldA = oldR?.profile?.audio;
+                    r.profile.audio.isLoaded = oldA ? oldA.isLoaded : false;
+                }
+                return {...r, selectedContact: oldR ? oldR.selectedContact : "", openDropdown: oldR ? oldR.openDropdown : false, resolving: oldR ? oldR.resolving : false, isErrorDeleted: oldR ? oldR.isErrorDeleted : false};
             });
         } catch (e) {}
     }

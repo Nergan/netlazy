@@ -1,7 +1,6 @@
 <template>
   <div id="app-container">
     
-    <!-- Banned State -->
     <div v-if="store.state.isBanned" class="welcome-container">
       <div class="welcome-box">
         <h1 class="welcome-brand" style="color: var(--accent-danger);">banned</h1>
@@ -25,7 +24,6 @@
       </div>
     </div>
 
-    <!-- Unregistered State -->
     <div v-else-if="!store.state.isRegistered" class="welcome-container">
       <div class="welcome-box">
         <h1 class="welcome-brand">netlazy</h1>
@@ -61,7 +59,6 @@
       </div>
     </div>
 
-    <!-- Main Application Layout -->
     <template v-else>
       <nav class="sidebar" :class="{ 'sidebar-collapsed': store.state.isSidebarCollapsed, 'is-resizing': isResizingSidebar }" :style="{ width: store.state.isSidebarCollapsed ? '60px' : store.state.sidebarWidth + 'px' }">
         <div class="resizer-v" @mousedown="startResize"></div>
@@ -84,7 +81,6 @@
               <i v-if="!store.state.isSidebarCollapsed || pendingInboxCount === 0" class="bi bi-inbox"></i> 
               <span v-else class="badge" style="margin: 0;">{{ pendingInboxCount }}</span>
               <span v-if="!store.state.isSidebarCollapsed">{{ store.t('inbox') }}</span>
-              <!-- Received requests badge -->
               <span class="badge" v-if="pendingInboxCount > 0 && !store.state.isSidebarCollapsed">{{ pendingInboxCount }}</span>
             </a>
           </div>
@@ -105,7 +101,6 @@
         </div>
       </nav>
       
-      <!-- Backdrop for mobile sidebar -->
       <div class="sidebar-backdrop" :class="{ active: !store.state.isSidebarCollapsed }" @click="store.state.isSidebarCollapsed = true"></div>
       
       <main class="main-view">
@@ -117,12 +112,10 @@
           <div style="width: 40px;"></div>
         </header>
 
-        <!-- Vue SFC Dynamic Router Mounting -->
         <Editor v-show="store.state.currentView === 'editor'" />
         <Feed v-show="store.state.currentView === 'feed'" />
         <Inbox v-show="store.state.currentView === 'inbox'" />
 
-        <!-- Static Vault View -->
         <div class="scrollable-content" v-show="store.state.currentView === 'vault'">
            <div style="margin-bottom: 2rem; color:var(--text-muted);">
              {{ store.t('vault_desc') }}
@@ -144,14 +137,12 @@
 
     <Lightbox />
 
-    <!-- Floating Toasts -->
     <div class="toast-container">
       <div class="toast" v-for="toast in store.state.toasts" :key="toast.id" :class="{'toast-minimal': toast.type === 'minimal', 'toast-danger': toast.type === 'danger'}">
         <i class="bi" :class="toast.icon"></i> {{ toast.msg }}
       </div>
     </div>
 
-    <!-- Custom System Confirmation Modals -->
     <transition name="lightbox-fade">
       <div class="modal-backdrop" v-if="store.state.confirmModal.open" @click="store.state.confirmModal.open = false">
         <div class="modal-box" @click.stop>
@@ -196,7 +187,7 @@ const displayPrivateKey = computed(() => {
   return store.state.privateKeyPem
     .replace(/-----BEGIN PRIVATE KEY-----/g, '')
     .replace(/-----END PRIVATE KEY-----/g, '')
-    .replace(/\r?\n|\r/g, '') // Strip off newline characters so styling container width can flow continuously
+    .replace(/\r?\n|\r/g, '')
     .trim();
 })
 
@@ -211,11 +202,13 @@ onMounted(async () => {
 
 async function checkBanStatus() {
   try {
-    await store.fetchMyProfile()
+    await api.get('/profile/me')
     store.state.isBanned = false
     store.addToast("Account restored", "bi-check-circle")
   } catch (e) {
-    store.addToast("Account is still banned", "bi-x-circle")
+    if (store.state.isBanned) {
+      store.addToast("Account is still banned", "bi-x-circle")
+    }
   }
 }
 

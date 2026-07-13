@@ -37,6 +37,10 @@ class TagRepository(ABC):
     @abstractmethod
     async def list_visible(self) -> List[Tag]:
         ...
+        
+    @abstractmethod
+    async def get_all_tags(self) -> List[Tag]:
+        ...
 
     @abstractmethod
     async def search(self, query: str) -> List[Tag]:
