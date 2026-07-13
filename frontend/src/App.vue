@@ -201,12 +201,21 @@ onMounted(async () => {
 })
 
 async function checkBanStatus() {
+  if (!store.state.userId || !store.state.keyPair) {
+    store.state.isBanned = false
+    store.logout()
+    return
+  }
+  
   try {
     await api.get('/profile/me')
     store.state.isBanned = false
     store.addToast("Account restored", "bi-check-circle")
   } catch (e) {
-    if (store.state.isBanned) {
+    if (e.response && (e.response.status === 401 || e.response.status === 404 || e.response.status === 422)) {
+      store.state.isBanned = false
+      store.logout()
+    } else if (store.state.isBanned) {
       store.addToast("Account is still banned", "bi-x-circle")
     }
   }

@@ -170,6 +170,15 @@ class MongoProfileRepository(ProfileRepository):
         query = {"user_id": {"$nin": ignored}, "created_at": {"$lt": cursor_dt}}
         if requires: query["tags"] = {"$all": requires}
         if excludes: query.setdefault("tags", {})["$nin"] = excludes
+
+        # Filter out completely empty profiles (either bio, media, audio, or at least 1 public contact method must exist)
+        query["$or"] = [
+            {"bio": {"$nin": ["", None]}},
+            {"media.0": {"$exists": True}},
+            {"audio": {"$type": "object"}},
+            {"contacts": {"$elemMatch": {"is_private": False, "type": {"$ne": "unknown"}, "value": {"$nin": ["", None]}}}}
+        ]
+
         db_cursor = db_instance.profiles_collection.find(query).sort("created_at", -1).limit(limit)
         return [self._to_domain(doc) async for doc in db_cursor]
 
