@@ -312,7 +312,11 @@ async function processFiles(files) {
       }
     }).catch(e => {
       if (e.name === 'CanceledError') return;
-      store.addToast("Failed to upload audio", "bi-exclamation-triangle")
+      if (e.response && e.response.data && e.response.data.detail) {
+          store.addToast(e.response.data.detail, "bi-exclamation-triangle")
+      } else {
+          store.addToast("Failed to upload audio", "bi-exclamation-triangle")
+      }
       store.state.myProfile.audio = null
     })
   }
@@ -355,7 +359,11 @@ async function processFiles(files) {
       }
     }).catch(e => {
       if (e.name === 'CanceledError') return;
-      store.addToast("Failed to upload media", "bi-exclamation-triangle")
+      if (e.response && e.response.data && e.response.data.detail) {
+          store.addToast(e.response.data.detail, "bi-exclamation-triangle")
+      } else {
+          store.addToast("Failed to upload media", "bi-exclamation-triangle")
+      }
       store.state.myProfile.media = store.state.myProfile.media.filter(m => m.url !== temp.url)
     })
   })

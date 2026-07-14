@@ -86,7 +86,8 @@ class AuthService:
 
             return new_user_id
 
-        async with db_instance.client.start_session() as session:
+        # Motor start_session() returns an async context manager, so it needs to be awaited before `async with`
+        async with await db_instance.client.start_session() as session:
             return await session.with_transaction(_transaction_callback)
 
     async def authenticate_request(
