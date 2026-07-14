@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime, timezone
+from pymongo import ReadPreference
 from app.domain.models import User, UserAlreadyExistsError
 from app.domain.repository import NonceRepository, UserRepository, ProfileRepository, HandshakeRepository
 from app.infrastructure import crypto_adapter
@@ -88,7 +89,7 @@ class AuthService:
 
         # Motor start_session() returns an async context manager, so it needs to be awaited before `async with`
         async with await db_instance.client.start_session() as session:
-            return await session.with_transaction(_transaction_callback)
+            return await session.with_transaction(_transaction_callback, read_preference=ReadPreference.PRIMARY)
 
     async def authenticate_request(
         self,
