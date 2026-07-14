@@ -37,6 +37,9 @@ class ProfileService:
         self._max_upload_bytes = max_upload_bytes
         self._image_max_dimension = image_max_dimension
         self._audio_bitrate = audio_bitrate
+        
+        # TODO: If scaled beyond a single worker, replace with a distributed lock 
+        # (e.g. Mongo-based lock document with a short TTL, or Redis) to guard against concurrent writes.
         self._locks = defaultdict(asyncio.Lock)
 
     async def get_or_create_profile(self, user_id: str) -> Profile:
@@ -63,7 +66,10 @@ class ProfileService:
         if len(raw_bytes) > self._max_upload_bytes:
             raise MediaProcessingError("File exceeds maximum upload size")
 
-        file_hash = hashlib.sha256(raw_bytes).hexdigest()
+        def _compute_hash(data: bytes) -> str:
+            return hashlib.sha256(data).hexdigest()
+            
+        file_hash = await asyncio.to_thread(_compute_hash, raw_bytes)
         
         async with self._locks[user_id]:
             profile = await self.get_or_create_profile(user_id)
@@ -72,7 +78,14 @@ class ProfileService:
                 if existing_media.media_type in ("image", "video") and len(profile.media) >= self._max_media_items:
                     raise MediaLimitExceededError(f"Maximum of {self._max_media_items} media items reached")
 
-                item = MediaItem(url=existing_media.url, media_type=existing_media.media_type, blur=blur, file_hash=file_hash)
+                item = MediaItem(
+                    url=existing_media.url, 
+                    media_type=existing_media.media_type, 
+                    blur=blur, 
+                    file_hash=file_hash,
+                    public_id=existing_media.public_id,
+                    resource_type=existing_media.resource_type
+                )
                 if existing_media.media_type == "audio":
                     profile.audio = item
                 else:
@@ -101,8 +114,15 @@ class ProfileService:
             raise MediaProcessingError(str(e)) from e
 
         public_id_hint = f"{user_id}/{media_type}_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
-        url = await self._media_storage.upload(processed, media_type, public_id_hint)
-        item = MediaItem(url=url, media_type=media_type, blur=blur, file_hash=file_hash)
+        upload_res = await self._media_storage.upload(processed, media_type, public_id_hint)
+        item = MediaItem(
+            url=upload_res["url"], 
+            media_type=media_type, 
+            blur=blur, 
+            file_hash=file_hash,
+            public_id=upload_res.get("public_id"),
+            resource_type=upload_res.get("resource_type")
+        )
 
         async with self._locks[user_id]:
             profile = await self.get_or_create_profile(user_id)
@@ -141,7 +161,7 @@ class ProfileService:
             if target.file_hash:
                 count = await self._profile_repo.count_media_usage(target.file_hash)
                 if count == 0:
-                    await self._media_storage.delete(target.url)
+                    await self._media_storage.delete(target.url, target.public_id, target.resource_type)
 
             return profile
 
@@ -159,7 +179,7 @@ class ProfileService:
             if target.file_hash:
                 count = await self._profile_repo.count_media_usage(target.file_hash)
                 if count == 0:
-                    await self._media_storage.delete(target.url)
+                    await self._media_storage.delete(target.url, target.public_id, target.resource_type)
 
             return profile
 
@@ -213,4 +233,4 @@ class ProfileService:
                     if m.file_hash:
                         count = await self._profile_repo.count_media_usage(m.file_hash)
                         if count == 0:
-                            await self._media_storage.delete(m.url)
+                            await self._media_storage.delete(m.url, m.public_id, m.resource_type)

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     pow_difficulty: int = 4
     bot_protection_delay: float = 0.5
 
+    # Security Endpoint API Key
+    admin_api_key: str = ""
+
     # Allows loading from .env if it exists
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

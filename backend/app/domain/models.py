@@ -26,6 +26,8 @@ class MediaItem:
     media_type: str
     blur: bool = False
     file_hash: str = ""
+    public_id: Optional[str] = None
+    resource_type: Optional[str] = None
 
 @dataclass
 class Contact:

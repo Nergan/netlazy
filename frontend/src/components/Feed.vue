@@ -212,7 +212,11 @@ async function sendRequest(profile, type, contactValue = null) {
     store.addToast(store.t('sent', { type }), 'bi-send-check')
     
   } catch (e) {
-    store.addToast("Failed to send handshake", "bi-x-circle")
+    if (e.response && e.response.data && e.response.data.detail) {
+      store.addToast(e.response.data.detail, "bi-x-circle")
+    } else {
+      store.addToast("Failed to send handshake", "bi-x-circle")
+    }
   } finally {
     profile.isSendingReq = null
   }

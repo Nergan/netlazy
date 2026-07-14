@@ -4,7 +4,7 @@ import os
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
@@ -90,6 +90,9 @@ if STATIC_DIR.exists():
     # Catch-all to serve index.html for Vue's SPA history mode
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404)
+        
         index_file = STATIC_DIR / "index.html"
         if index_file.exists():
             return FileResponse(index_file)

@@ -53,35 +53,41 @@ class AuthService:
         except crypto_adapter.InvalidPublicKeyError as e:
             raise InvalidPublicKeyError(str(e)) from e
 
-        existing_user = await self._user_repo.get_by_id(new_user_id)
-        if existing_user:
-            raise UserAlreadyExistsError("New public key already registered")
+        from app.database import db_instance
 
-        old_user = await self._user_repo.get_by_id(old_user_id)
-        known_ips = old_user.known_ips if old_user else []
-        known_fingerprints = old_user.known_fingerprints if old_user else []
+        async def _transaction_callback(session):
+            existing_user = await self._user_repo.get_by_id(new_user_id, session=session)
+            if existing_user:
+                raise UserAlreadyExistsError("New public key already registered")
 
-        new_user = User(
-            user_id=new_user_id,
-            public_key_pem=new_public_key_pem,
-            created_at=datetime.now(timezone.utc),
-            known_ips=known_ips,
-            known_fingerprints=known_fingerprints
-        )
-        await self._user_repo.create(new_user)
+            old_user = await self._user_repo.get_by_id(old_user_id, session=session)
+            known_ips = old_user.known_ips if old_user else []
+            known_fingerprints = old_user.known_fingerprints if old_user else []
 
-        old_profile = await profile_repo.get_by_user_id(old_user_id)
-        if old_profile:
-            old_profile.user_id = new_user_id
-            old_profile.updated_at = datetime.now(timezone.utc)
-            await profile_repo.upsert(old_profile)
-            await profile_repo.delete(old_user_id)
+            new_user = User(
+                user_id=new_user_id,
+                public_key_pem=new_public_key_pem,
+                created_at=datetime.now(timezone.utc),
+                known_ips=known_ips,
+                known_fingerprints=known_fingerprints
+            )
+            await self._user_repo.create(new_user, session=session)
 
-        await handshake_repo.delete_for_user(old_user_id)
-        await self._nonce_repo.delete_for_user(old_user_id)
-        await self._user_repo.delete(old_user_id)
+            old_profile = await profile_repo.get_by_user_id(old_user_id, session=session)
+            if old_profile:
+                old_profile.user_id = new_user_id
+                old_profile.updated_at = datetime.now(timezone.utc)
+                await profile_repo.upsert(old_profile, session=session)
+                await profile_repo.delete(old_user_id, session=session)
 
-        return new_user_id
+            await handshake_repo.delete_for_user(old_user_id, session=session)
+            await self._nonce_repo.delete_for_user(old_user_id, session=session)
+            await self._user_repo.delete(old_user_id, session=session)
+
+            return new_user_id
+
+        async with db_instance.client.start_session() as session:
+            return await session.with_transaction(_transaction_callback)
 
     async def authenticate_request(
         self,

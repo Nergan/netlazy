@@ -30,13 +30,18 @@ class InboxItemResponse(BaseModel):
 
 @router.post("/handshakes", response_model=InboxItemResponse, dependencies=[Depends(verify_pow)])
 async def send_handshake(body: HandshakeCreateRequest, user: User = Depends(verify_request_signature)):
-    h = await inbox_service.send_handshake(
-        sender_id=user.user_id,
-        receiver_id=body.receiver_id,
-        handshake_type=body.type,
-        offered_contact=body.offered_contact
-    )
-    
+    try:
+        h = await inbox_service.send_handshake(
+            sender_id=user.user_id,
+            receiver_id=body.receiver_id,
+            handshake_type=body.type,
+            offered_contact=body.offered_contact
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidHandshakeStateError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+        
     receiver_profile = await profile_service.get_or_create_profile(body.receiver_id)
     return InboxItemResponse(
         id=h.id, type=h.handshake_type, status=h.status,
@@ -64,6 +69,8 @@ async def resolve_handshake(handshake_id: str, body: HandshakeResolveRequest, us
         raise HTTPException(status_code=404, detail=str(e))
     except OtherUserBannedError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     sender_profile = await profile_service.get_or_create_profile(h.sender_id)
     return InboxItemResponse(

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Any
 from pymongo.errors import DuplicateKeyError
 from app.database import db_instance
 from app.domain.models import Contact, Handshake, MediaItem, PoWChallenge, Profile, Tag, User, UserAlreadyExistsError
@@ -13,7 +13,7 @@ def _force_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 class MongoUserRepository(UserRepository):
-    async def create(self, user: User) -> None:
+    async def create(self, user: User, session: Any = None) -> None:
         try:
             await db_instance.users_collection.insert_one({
                 "user_id": user.user_id,
@@ -22,12 +22,12 @@ class MongoUserRepository(UserRepository):
                 "known_ips": user.known_ips,
                 "known_fingerprints": user.known_fingerprints,
                 "is_banned": user.is_banned,
-            })
+            }, session=session)
         except DuplicateKeyError:
             raise UserAlreadyExistsError(f"User {user.user_id} already registered")
 
-    async def get_by_id(self, user_id: str) -> Optional[User]:
-        doc = await db_instance.users_collection.find_one({"user_id": user_id})
+    async def get_by_id(self, user_id: str, session: Any = None) -> Optional[User]:
+        doc = await db_instance.users_collection.find_one({"user_id": user_id}, session=session)
         if not doc: return None
         return User(
             user_id=doc["user_id"],
@@ -45,8 +45,15 @@ class MongoUserRepository(UserRepository):
         if fingerprint: updates["known_fingerprints"] = fingerprint
         await db_instance.users_collection.update_one({"user_id": user_id}, {"$addToSet": updates})
 
-    async def delete(self, user_id: str) -> None:
-        await db_instance.users_collection.delete_one({"user_id": user_id})
+    async def delete(self, user_id: str, session: Any = None) -> None:
+        await db_instance.users_collection.delete_one({"user_id": user_id}, session=session)
+        
+    async def get_active_user_ids(self, user_ids: List[str]) -> List[str]:
+        cursor = db_instance.users_collection.find({
+            "user_id": {"$in": user_ids},
+            "is_banned": {"$ne": True}
+        }, {"user_id": 1})
+        return [doc["user_id"] async for doc in cursor]
 
 class MongoNonceRepository(NonceRepository):
     async def insert_if_not_exists(self, user_id: str, nonce: str) -> bool:
@@ -60,8 +67,8 @@ class MongoNonceRepository(NonceRepository):
         except DuplicateKeyError:
             return False
 
-    async def delete_for_user(self, user_id: str) -> None:
-        await db_instance.used_nonces_collection.delete_many({"user_id": user_id})
+    async def delete_for_user(self, user_id: str, session: Any = None) -> None:
+        await db_instance.used_nonces_collection.delete_many({"user_id": user_id}, session=session)
 
 class MongoSecurityRepository(SecurityRepository):
     async def create_challenge(self, challenge: PoWChallenge) -> None:
@@ -153,8 +160,8 @@ class MongoTagRepository(TagRepository):
         )
 
 class MongoProfileRepository(ProfileRepository):
-    async def get_by_user_id(self, user_id: str) -> Optional[Profile]:
-        doc = await db_instance.profiles_collection.find_one({"user_id": user_id})
+    async def get_by_user_id(self, user_id: str, session: Any = None) -> Optional[Profile]:
+        doc = await db_instance.profiles_collection.find_one({"user_id": user_id}, session=session)
         if not doc: return None
         return self._to_domain(doc)
         
@@ -162,11 +169,12 @@ class MongoProfileRepository(ProfileRepository):
         cursor = db_instance.profiles_collection.find({"user_id": {"$in": user_ids}})
         return [self._to_domain(doc) async for doc in cursor]
 
-    async def upsert(self, profile: Profile) -> None:
+    async def upsert(self, profile: Profile, session: Any = None) -> None:
         await db_instance.profiles_collection.update_one(
             {"user_id": profile.user_id},
             {"$set": self._to_doc(profile)},
             upsert=True,
+            session=session
         )
 
     async def get_feed(self, viewer_id: str, exclude_ids: List[str], cursor_dt: datetime, requires: List[str], excludes: List[str], limit: int) -> List[Profile]:
@@ -189,8 +197,8 @@ class MongoProfileRepository(ProfileRepository):
         db_cursor = db_instance.profiles_collection.find(query).sort("created_at", -1).limit(limit)
         return [self._to_domain(doc) async for doc in db_cursor]
 
-    async def delete(self, user_id: str) -> None:
-        await db_instance.profiles_collection.delete_one({"user_id": user_id})
+    async def delete(self, user_id: str, session: Any = None) -> None:
+        await db_instance.profiles_collection.delete_one({"user_id": user_id}, session=session)
 
     async def count_media_usage(self, file_hash: str) -> int:
         if not file_hash: return 0
@@ -237,8 +245,12 @@ class MongoProfileRepository(ProfileRepository):
             updated_at=_force_utc(doc.get("updated_at")),
         )
 
-    def _media_to_doc(self, m: MediaItem) -> dict: return {"url": m.url, "media_type": m.media_type, "blur": m.blur, "file_hash": m.file_hash}
-    def _media_from_doc(self, d: dict) -> MediaItem: return MediaItem(url=d["url"], media_type=d["media_type"], blur=d.get("blur", False), file_hash=d.get("file_hash", ""))
+    def _media_to_doc(self, m: MediaItem) -> dict: 
+        return {"url": m.url, "media_type": m.media_type, "blur": m.blur, "file_hash": m.file_hash, "public_id": m.public_id, "resource_type": m.resource_type}
+        
+    def _media_from_doc(self, d: dict) -> MediaItem: 
+        return MediaItem(url=d["url"], media_type=d["media_type"], blur=d.get("blur", False), file_hash=d.get("file_hash", ""), public_id=d.get("public_id"), resource_type=d.get("resource_type"))
+        
     def _contact_to_doc(self, c: Contact) -> dict: return {"type": c.type, "value": c.value, "is_private": c.is_private}
     def _contact_from_doc(self, d: dict) -> Contact: return Contact(type=d["type"], value=d["value"], is_private=d.get("is_private", True))
 
@@ -291,8 +303,8 @@ class MongoHandshakeRepository(HandshakeRepository):
                 interacted.add(doc["sender_id"])
         return list(interacted)
 
-    async def delete_for_user(self, user_id: str) -> None:
-        await db_instance.handshakes_collection.delete_many({"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]})
+    async def delete_for_user(self, user_id: str, session: Any = None) -> None:
+        await db_instance.handshakes_collection.delete_many({"$or": [{"sender_id": user_id}, {"receiver_id": user_id}]}, session=session)
 
     def _to_doc(self, h: Handshake) -> dict:
         return {

@@ -1,10 +1,14 @@
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from app.config import settings
 from app.presentation.dependencies import security_service
 
 router = APIRouter(prefix="/security", tags=["Security"])
+
+async def verify_admin(x_admin_key: str = Header(None)):
+    if not settings.admin_api_key or x_admin_key != settings.admin_api_key:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 class ChallengeResponse(BaseModel):
     challenge_id: str
@@ -17,7 +21,7 @@ async def get_challenge():
     data = await security_service.generate_challenge()
     return ChallengeResponse(**data)
 
-@router.post("/ban/{user_id}")
+@router.post("/ban/{user_id}", dependencies=[Depends(verify_admin)])
 async def cascade_ban_user(user_id: str):
     """
     Administrative Endpoint: Triggers a cascade ban globally blocking all known IPs 

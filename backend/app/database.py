@@ -130,6 +130,9 @@ async def connect_to_mongo():
         ],
         db_instance.bans_collection: [
             ([("type", ASCENDING), ("value", ASCENDING)], {"unique": True})
+        ],
+        db_instance.logs_collection: [
+            ("timestamp", {"expireAfterSeconds": 30 * 24 * 60 * 60})
         ]
     }
 

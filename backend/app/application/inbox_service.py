@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Tuple
 from app.domain.models import Handshake, Profile
-from app.domain.repository import HandshakeRepository, ProfileRepository
+from app.domain.repository import HandshakeRepository, ProfileRepository, UserRepository
 
 class HandshakeNotFoundError(Exception): pass
 class InvalidHandshakeStateError(Exception): pass
@@ -11,13 +11,22 @@ class OtherUserNotFoundError(Exception): pass
 class OtherUserBannedError(Exception): pass
 
 class InboxService:
-    def __init__(self, handshake_repo: HandshakeRepository, profile_repo: ProfileRepository):
+    def __init__(self, handshake_repo: HandshakeRepository, profile_repo: ProfileRepository, user_repo: UserRepository):
         self._handshake_repo = handshake_repo
         self._profile_repo = profile_repo
+        self._user_repo = user_repo
 
     async def send_handshake(self, sender_id: str, receiver_id: str, handshake_type: str, offered_contact: str = None) -> Handshake:
+        if handshake_type in ("share", "exchange", "mutual") and not offered_contact:
+            raise ValueError(f"offered_contact is required for handshake type '{handshake_type}'")
+        if handshake_type == "demand" and offered_contact:
+            raise ValueError("offered_contact must be empty for handshake type 'demand'")
+
         existing = await self._handshake_repo.get_between_users(sender_id, receiver_id)
         if existing:
+            if existing.status == "declined" and existing.receiver_id == receiver_id:
+                raise InvalidHandshakeStateError("Cannot send handshake: previously declined by receiver")
+                
             existing.sender_id = sender_id
             existing.receiver_id = receiver_id
             existing.handshake_type = handshake_type
@@ -52,12 +61,17 @@ class InboxService:
         if h.status != "pending":
             raise InvalidHandshakeStateError(f"Handshake is already {h.status}")
 
+        if status == "accepted":
+            if h.handshake_type in ("demand", "exchange", "mutual") and not returned_contact:
+                raise ValueError(f"returned_contact is required to accept handshake type '{h.handshake_type}'")
+            if h.handshake_type == "share" and returned_contact:
+                raise ValueError("returned_contact should not be provided for handshake type 'share'")
+
         other_id = h.sender_id if h.receiver_id == user_id else h.receiver_id
-        from app.database import db_instance
-        other_user = await db_instance.users_collection.find_one({"user_id": other_id})
+        other_user = await self._user_repo.get_by_id(other_id)
         if not other_user:
             raise OtherUserNotFoundError("user account has been deleted")
-        if other_user.get("is_banned"):
+        if getattr(other_user, "is_banned", False):
             raise OtherUserBannedError("user account has been banned")
 
         h.status = status
@@ -79,12 +93,7 @@ class InboxService:
 
         other_user_ids = {h.sender_id if h.receiver_id == user_id else h.receiver_id for h in handshakes}
 
-        from app.database import db_instance
-        active_users_cursor = db_instance.users_collection.find({
-            "user_id": {"$in": list(other_user_ids)},
-            "is_banned": {"$ne": True}
-        })
-        active_user_ids = {u["user_id"] async for u in active_users_cursor}
+        active_user_ids = set(await self._user_repo.get_active_user_ids(list(other_user_ids)))
 
         profiles = await self._profile_repo.get_by_user_ids(list(other_user_ids))
         profile_map = {p.user_id: p for p in profiles}

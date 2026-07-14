@@ -57,7 +57,8 @@ feed_service = FeedService(
 
 inbox_service = InboxService(
     handshake_repo=handshake_repo,
-    profile_repo=profile_repo
+    profile_repo=profile_repo,
+    user_repo=user_repo
 )
 
 security_service = SecurityService(
@@ -81,6 +82,10 @@ async def verify_request_signature(
     x_signature: str = Header(...),
 ) -> User:
     
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > settings.max_upload_bytes:
+        raise HTTPException(status_code=413, detail="Payload Too Large")
+
     ip, fingerprint = _get_client_footprint(request)
     
     try:
